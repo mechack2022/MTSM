@@ -1,0 +1,48 @@
+# Environment & Secrets
+.env
+*.pem
+*.key
+credentials.json
+
+# Backend (Java/Maven)
+backend/target/
+backend/.mvn/
+backend/out/
+backend/*.jar
+backend/*.war
+backend/.idea/
+backend/*.iml
+backend/.settings/
+backend/.classpath
+backend/.project
+backend/bin/
+backend/mvnw
+backend/mvnw.cmd
+
+# Client (Node)
+client/node_modules/
+client/dist/
+client/build/
+client/.next/
+client/.cache/
+client/.parcel-cache/
+client/coverage/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.log
+db_data/
+
+# Testing
+*.test.log
+test-results/

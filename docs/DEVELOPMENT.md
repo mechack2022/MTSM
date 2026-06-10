@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Java 17+
+- Java 21+
 - Node.js 20+
 - Docker & Docker Compose
 - Maven (or use included wrapper)

@@ -34,7 +34,49 @@
         </createTable>
     </changeSet>
 
-    <!-- 2. Learner Table -->
+    <!-- 2. App User Table (Authentication & Roles) -->
+    <changeSet id="001-create-app-user-table" author="system">
+        <comment>Create app_user table for authentication and role-based access (BRD NFR-7, Section 6). Note: 'app_user' is used instead of 'user' to avoid SQL reserved keyword conflicts.</comment>
+        <createTable tableName="app_user">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="school_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+            <column name="username" type="varchar(100)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="password_hash" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="full_name" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="role" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_active" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+                baseTableName="app_user"
+                baseColumnNames="school_id"
+                referencedTableName="school"
+                referencedColumnNames="id"
+                constraintName="fk_app_user_school"
+                onDelete="CASCADE"/>
+    </changeSet>
+
+    <!-- 3. Learner Table -->
     <changeSet id="001-create-learner-table" author="system">
         <comment>Create learner table with deactivation support (BRD FR-3, BR-5)</comment>
         <createTable tableName="learner">
@@ -83,7 +125,7 @@
                 constraintName="uk_learner_school_student_number"/>
     </changeSet>
 
-    <!-- 3. Enrollment Table -->
+    <!-- 4. Enrollment Table -->
     <changeSet id="001-create-enrollment-table" author="system">
         <comment>Create enrollment table - time-bound learner-to-class linking (BRD §8)</comment>
         <createTable tableName="enrollment">
@@ -126,7 +168,7 @@
                 onDelete="CASCADE"/>
     </changeSet>
 
-    <!-- 4. Attendance Table -->
+    <!-- 5. Attendance Table -->
     <changeSet id="001-create-attendance-table" author="system">
         <comment>Create attendance table - one record per learner/date (BRD BR-1, FR-10)</comment>
         <createTable tableName="attendance">
@@ -143,7 +185,8 @@
                 <constraints nullable="false"/>
             </column>
             <column name="notes" type="text"/>
-            <column name="recorded_by" type="varchar(100)"/>
+            <!-- UPDATED: Changed from varchar to uuid to link to app_user -->
+            <column name="recorded_by" type="uuid"/>
             <column name="recorded_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
                 <constraints nullable="false"/>
             </column>
@@ -169,6 +212,15 @@
                 constraintName="fk_attendance_learner"
                 onDelete="CASCADE"/>
 
+        <!-- ADDED: Link recorded_by to app_user -->
+        <addForeignKeyConstraint
+                baseTableName="attendance"
+                baseColumnNames="recorded_by"
+                referencedTableName="app_user"
+                referencedColumnNames="id"
+                constraintName="fk_attendance_recorded_by"
+                onDelete="NO ACTION"/>
+
         <addUniqueConstraint
                 tableName="attendance"
                 columnNames="learner_id, attendance_date"
@@ -183,7 +235,7 @@
         </createIndex>
     </changeSet>
 
-    <!-- 5. Change Log Table -->
+    <!-- 6. Change Log Table -->
     <changeSet id="001-create-change-log-table" author="system">
         <comment>Create change_log table - audit trail for sync (BRD BR-2, FR-18)</comment>
         <createTable tableName="change_log">
@@ -206,7 +258,8 @@
                 <constraints nullable="false"/>
             </column>
             <column name="previous_data" type="jsonb"/>
-            <column name="changed_by" type="varchar(100)"/>
+            <!-- UPDATED: Changed from varchar to uuid to link to app_user -->
+            <column name="changed_by" type="uuid"/>
             <column name="sync_status" type="varchar(20)" defaultValue="PENDING">
                 <constraints nullable="false"/>
             </column>
@@ -214,6 +267,15 @@
                 <constraints nullable="false"/>
             </column>
         </createTable>
+
+        <!-- ADDED: Link changed_by to app_user -->
+        <addForeignKeyConstraint
+                baseTableName="change_log"
+                baseColumnNames="changed_by"
+                referencedTableName="app_user"
+                referencedColumnNames="id"
+                constraintName="fk_change_log_changed_by"
+                onDelete="NO ACTION"/>
 
         <createIndex tableName="change_log" indexName="idx_change_log_entity">
             <column name="entity_type"/>

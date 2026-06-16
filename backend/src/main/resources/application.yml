@@ -2,16 +2,27 @@ spring:
   application:
     name: school-attendance-api
 
+  security:
+    jwt:
+      secret-key: ${JWT_SECRET:my-super-secret-fallback-key-for-local-dev-only-change-in-prod}
+      expiration-time: 86400000 # 24 hours in milliseconds
+
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/attendance_db}
-    username: ${DB_USER:attendance_user}
-    password: ${DB_PASSWORD:changeme}
+    url: ${DB_URL:jdbc:postgresql://localhost:5434/attendance_db}
+    username: attendance_user
+    password: ${DB_PASSWORD:mechack@200}
     driver-class-name: org.postgresql.Driver
+    # HikariCP tuning for better performance under load
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 20000 # 20 seconds
 
   jpa:
     hibernate:
-      ddl-auto: validate  # Never auto-DDL; migrations only
+      ddl-auto: validate  # NEVER auto-DDL; Liquibase handles schema exclusively
     show-sql: false
+    open-in-view: false   # CRITICAL: Prevents lazy-loading exceptions when serializing JSON in REST controllers
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
@@ -21,8 +32,14 @@ spring:
     enabled: true
     change-log: classpath:db/changelog/db.changelog-master.yaml
 
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
 server:
   port: ${SERVER_PORT:8080}
+  shutdown: graceful
 
 management:
   endpoints:
@@ -32,8 +49,15 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+      probes:
+        enabled: true
 
 logging:
   level:
     com.school.attendance: INFO
     org.springframework.web: INFO
+    org.springframework.security: INFO
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}

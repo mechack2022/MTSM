@@ -61,27 +61,37 @@ public class DataSeeder implements CommandLineRunner {
 
     private void seedAdminUser() {
         String adminUsername = "admin";
-        if (!userRepository.existsByUsername(adminUsername)) {
-            School school = schoolRepository.findAll().stream()
-                    .findFirst()
-                    .orElseThrow(() -> new RuntimeException("No school found to assign to Admin. Check DataSeeder."));
-            AppUser admin = AppUser.builder()
-                    .username(adminUsername)
-                    .passwordHash(passwordEncoder.encode(defaultAdminPassword))
-                    .fullName("System Administrator")
-                    .role(UserRole.ADMIN)
-                    .schoolId(school.getId())
-                    .isActive(true)
-                    .build();
+        userRepository.findByUsername(adminUsername)
+                .ifPresent(u -> log.info("ℹ️ Admin user already exists, skipping seed."));
 
-            userRepository.save(admin);
+        userRepository.findByUsername(adminUsername)
+                .ifPresentOrElse(
+                        // 1. Consumer: What to do if the user ALREADY exists
+                        user -> log.info("ℹ️ Admin user '{}' already exists, skipping seed.", user.getUsername()),
+                        // 2. Runnable: What to do if the user is EMPTY (doesn't exist)
+                        () -> {
+                            School school = schoolRepository.findFirstByOrderByIdAsc()
+                                    .orElseThrow(() -> new RuntimeException("No school found to assign to Admin."));
+                            AppUser admin = AppUser.builder()
+                                    .username(adminUsername)
+                                    .passwordHash(passwordEncoder.encode(defaultAdminPassword))
+                                    .fullName("System Administrator")
+                                    .role(UserRole.ADMIN)
+                                    .schoolId(school.getId())
+                                    .isActive(true)
+                                    .build();
 
-            // Log credentials clearly for the developer
-            log.info("==================================================");
-            log.info(" ADMIN USER SEEDED SUCCESSFULLY");
-            log.info("👤 Username: {}", adminUsername);
-            log.info(" Login URL: http://localhost:8080/api/v1/auth/login");
-            log.info("==================================================");
+                            userRepository.save(admin);
+                            logAdminCredentials(adminUsername);
+                        });
         }
+
+    // Helper method to keep the lambda clean
+    private void logAdminCredentials(String username) {
+        log.info("==================================================");
+        log.info("🔐 ADMIN USER SEEDED SUCCESSFULLY");
+        log.info("👤 Username: {}", username);
+        log.info(" Login URL: http://localhost:8080/api/v1/auth/login");
+        log.info("==================================================");
     }
 }

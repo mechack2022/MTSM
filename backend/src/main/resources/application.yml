@@ -2,15 +2,18 @@ spring:
   application:
     name: school-attendance-api
 
+  profiles:
+    active: dev
+
   security:
     jwt:
-      secret-key: ${JWT_SECRET:my-super-secret-fallback-key-for-local-dev-only-change-in-prod}
+      secret-key: ${JWT_SECRET}
       expiration-time: 86400000 # 24 hours in milliseconds
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5434/attendance_db}
+    url: ${DB_URL}
     username: attendance_user
-    password: ${DB_PASSWORD:mechack@200}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     # HikariCP tuning for better performance under load
     hikari:
@@ -61,3 +64,6 @@ logging:
 app:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
+  seed:
+    enabled: true
+    admin-password: ${SEED_ADMIN_PASSWORD}

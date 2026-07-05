@@ -3,7 +3,6 @@ package com.school.attendance.common.api;
 import java.util.List;
 import java.util.stream.Collectors;
 
-// A custom functional interface for mapping Entities to DTOs
 @FunctionalInterface
 public interface EntityMapper<E, D> {
 

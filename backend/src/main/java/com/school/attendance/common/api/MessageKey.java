@@ -9,7 +9,10 @@ public enum MessageKey {
     AUTH_BAD_CREDENTIALS(HttpStatus.UNAUTHORIZED, "auth.error.bad_credentials", "AUTH_001"),
     AUTH_USER_NOT_FOUND(HttpStatus.NOT_FOUND, "auth.error.user_not_found", "AUTH_002"),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "error.validation", "VALIDATION_001"),
-    INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "error.internal", "SYS_001");
+    INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "error.internal", "SYS_001"),
+    USER_LIST_SUCCESS(HttpStatus.OK, "user.list.success", null),
+    USER_ALREADY_EXISTS(HttpStatus.CONFLICT, "user.error.already_exists", "USER_001"),
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "user.error.not_found", "USER_002");
 
     private final HttpStatus httpStatus;
     private final String propertyKey;

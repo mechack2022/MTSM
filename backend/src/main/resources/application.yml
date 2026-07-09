@@ -7,7 +7,7 @@ spring:
 
   security:
     jwt:
-      secret-key: ${JWT_SECRET}
+      secret-key: ${JWT_SECRET:dGVzdC1zZWNyZXQta2V5LWZvci1pbnRlZ3JhdGlvbi10ZXN0cy1vbmx5LTEyMzQ1Njc4OTA=}
       expiration-time: 86400000 # 24 hours in milliseconds
 
   datasource:

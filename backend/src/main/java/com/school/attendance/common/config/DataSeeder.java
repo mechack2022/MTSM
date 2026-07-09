@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@Profile({"dev", "test"})
+@Profile({"dev"})
 public class DataSeeder implements CommandLineRunner {
 
     private final AppUserRepository userRepository;

@@ -4,6 +4,7 @@ package com.school.attendance.common.api;
 import org.springframework.http.HttpStatus;
 
 public enum MessageKey {
+
     AUTH_LOGIN_SUCCESS(HttpStatus.OK, "auth.login.success", null),
     USER_CREATE_SUCCESS(HttpStatus.CREATED, "user.create.success", null),
     AUTH_BAD_CREDENTIALS(HttpStatus.UNAUTHORIZED, "auth.error.bad_credentials", "AUTH_001"),
@@ -12,7 +13,8 @@ public enum MessageKey {
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "error.internal", "SYS_001"),
     USER_LIST_SUCCESS(HttpStatus.OK, "user.list.success", null),
     USER_ALREADY_EXISTS(HttpStatus.CONFLICT, "user.error.already_exists", "USER_001"),
-    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "user.error.not_found", "USER_002");
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "user.error.not_found", "USER_002"),
+    AUTH_UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "auth.error.unauthorized", "AUTH_003");
 
     private final HttpStatus httpStatus;
     private final String propertyKey;

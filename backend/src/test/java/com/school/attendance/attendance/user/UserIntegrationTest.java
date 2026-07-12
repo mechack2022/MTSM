@@ -1,97 +1,259 @@
 package com.school.attendance.attendance.user;
 
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.school.attendance.attendance.BaseIntegrationTest;
-import com.school.attendance.school.SchoolRepository;
-import com.school.attendance.school.entity.School;
-import com.school.attendance.user.entity.AppUser;
+import com.school.attendance.user.dto.CreateUserRequest;
+import com.school.attendance.user.dto.UpdateUserRequest;
 import com.school.attendance.user.enums.UserRole;
-import com.school.attendance.user.repository.AppUserRepository;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.hamcrest.Matchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class UserIntegrationTest extends BaseIntegrationTest {
 
-    @Autowired private MockMvc mockMvc;
-    @Autowired private ObjectMapper objectMapper;
-    @Autowired private AppUserRepository userRepository;
-    @Autowired private SchoolRepository schoolRepository;
-    @Autowired private PasswordEncoder passwordEncoder;
+    @Nested
+    @DisplayName("POST /api/v1/users")
+    class CreateUserTests {
 
-    private String adminToken;
-    private String teacherToken;
+        @Test
+        @DisplayName("ADMIN - Should create a new teacher successfully")
+        void adminShouldCreateUser() throws Exception {
+            CreateUserRequest request = new CreateUserRequest(
+                    "new_teacher", "SecurePass123!", "John Smith", UserRole.TEACHER
+            );
 
-    @BeforeEach
-    void setUp() throws Exception {
+            mockMvc.perform(post("/api/v1/users")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.status").value(201))
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.data.username").value("new_teacher"))
+                    .andExpect(jsonPath("$.data.role").value("TEACHER"))
+                    .andExpect(jsonPath("$.data.isActive").value(true));
+        }
 
-        userRepository.deleteAll();
-        schoolRepository.deleteAll();
+        @Test
+        @DisplayName("ADMIN - Should return 409 for duplicate username")
+        void adminShouldGet409ForDuplicate() throws Exception {
+            CreateUserRequest request = new CreateUserRequest(
+                    "admin_test", "password", "Duplicate", UserRole.TEACHER
+            );
 
-        School school = schoolRepository.save(School.builder().name("Test School").code("TEST-01").build());
+            mockMvc.perform(post("/api/v1/users")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.error.code").value("USER_001"));
+        }
 
-        // Create Admin and Teacher
-        userRepository.save(AppUser.builder().username("admin").passwordHash(passwordEncoder.encode("Admin123!")).fullName("Admin").role(UserRole.ADMIN).schoolId(school.getId()).isActive(true).build());
-        userRepository.save(AppUser.builder().username("teacher").passwordHash(passwordEncoder.encode("Teach123!")).fullName("Teacher").role(UserRole.TEACHER).schoolId(school.getId()).isActive(true).build());
+        @Test
+        @DisplayName("TEACHER - Should be forbidden (403) from creating users")
+        void teacherShouldBeForbidden() throws Exception {
+            CreateUserRequest request = new CreateUserRequest(
+                    "new_user", "password", "Name", UserRole.TEACHER
+            );
 
-        // Fetch JWT Tokens for both users to use in subsequent tests
-        adminToken = extractToken("admin", "Admin123!");
-        teacherToken = extractToken("teacher", "Teach123!");
+            mockMvc.perform(post("/api/v1/users")
+                            .header("Authorization", "Bearer " + teacherToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("HEAD_TEACHER - Should be forbidden (403) from creating users")
+        void headTeacherShouldBeForbidden() throws Exception {
+            CreateUserRequest request = new CreateUserRequest(
+                    "new_user", "password", "Name", UserRole.TEACHER
+            );
+
+            mockMvc.perform(post("/api/v1/users")
+                            .header("Authorization", "Bearer " + headTeacherToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("Unauthenticated - Should return 401")
+        void unauthenticatedShouldGet401() throws Exception {
+            CreateUserRequest request = new CreateUserRequest(
+                    "new_user", "password", "Name", UserRole.TEACHER
+            );
+
+            mockMvc.perform(post("/api/v1/users")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isUnauthorized());
+        }
     }
 
-    private String extractToken(String username, String password) throws Exception {
-        String json = String.format("{\"username\":\"%s\", \"password\":\"%s\"}", username, password);
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON).content(json)).andReturn();
-        JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString());
-        return response.get("data").get("token").asText();
+    @Nested
+    @DisplayName("GET /api/v1/users")
+    class GetAllUsersTests {
+
+        @Test
+        @DisplayName("ADMIN - Should list all users")
+        void adminShouldListUsers() throws Exception {
+            mockMvc.perform(get("/api/v1/users")
+                            .header("Authorization", "Bearer " + adminToken))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.data", hasSize(3)))
+                    .andExpect(jsonPath("$.data[*].username", hasItems("admin_test", "head_test", "teacher_test")));
+        }
+
+        @Test
+        @DisplayName("HEAD_TEACHER - Should list all users")
+        void headTeacherShouldListUsers() throws Exception {
+            mockMvc.perform(get("/api/v1/users")
+                            .header("Authorization", "Bearer " + headTeacherToken))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data", hasSize(3)));
+        }
+
+        @Test
+        @DisplayName("TEACHER - Should be forbidden from listing users")
+        void teacherShouldBeForbidden() throws Exception {
+            mockMvc.perform(get("/api/v1/users")
+                            .header("Authorization", "Bearer " + teacherToken))
+                    .andExpect(status().isForbidden());
+        }
     }
 
-    @Test
-    void shouldRejectUnauthenticatedRequest() throws Exception {
-        String requestBody = """
-                { "username": "newuser", "password": "Pass123!", "fullName": "New User", "role": "TEACHER" }
-                """;
+    @Nested
+    @DisplayName("GET /api/v1/users/{id}")
+    class GetUserByIdTests {
 
-        mockMvc.perform(post("/api/v1/users").contentType(MediaType.APPLICATION_JSON).content(requestBody))
-                .andExpect(status().isUnauthorized()); // 401
+        @Test
+        @DisplayName("ADMIN - Should retrieve a specific user")
+        void adminShouldGetUser() throws Exception {
+            mockMvc.perform(get("/api/v1/users/" + teacherUser.getId())
+                            .header("Authorization", "Bearer " + adminToken))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.username").value("teacher_test"))
+                    .andExpect(jsonPath("$.data.role").value("TEACHER"));
+        }
+
+        @Test
+        @DisplayName("ADMIN - Should return 404 for non-existent user")
+        void adminShouldGet404() throws Exception {
+            mockMvc.perform(get("/api/v1/users/00000000-0000-0000-0000-000000000000")
+                            .header("Authorization", "Bearer " + adminToken))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.error.code").value("USER_002"));
+        }
     }
 
-    @Test
-    void shouldRejectTeacherFromCreatingUsers() throws Exception {
-        String requestBody = """
-                { "username": "newuser", "password": "Pass123!", "fullName": "New User", "role": "TEACHER" }
-                """;
+    @Nested
+    @DisplayName("GET /api/v1/users/me")
+    class GetCurrentUserTests {
 
-        mockMvc.perform(post("/api/v1/users")
-                        .header("Authorization", "Bearer " + teacherToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
-                .andExpect(status().isForbidden());
+        @Test
+        @DisplayName("Any authenticated user - Should retrieve their own profile")
+        void anyUserShouldGetOwnProfile() throws Exception {
+            mockMvc.perform(get("/api/v1/users/me")
+                            .header("Authorization", "Bearer " + teacherToken))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.username").value("teacher_test"))
+                    .andExpect(jsonPath("$.data.role").value("TEACHER"));
+        }
+
+        @Test
+        @DisplayName("Unauthenticated - Should return 401")
+        void unauthenticatedShouldGet401() throws Exception {
+            mockMvc.perform(get("/api/v1/users/me"))
+                    .andExpect(status().isUnauthorized());
+        }
     }
 
-    @Test
-    void shouldAllowAdminToCreateUser() throws Exception {
-        String requestBody = """
-                { "username": "newheadteacher", "password": "SecurePass!", "fullName": "Jane Doe", "role": "HEAD_TEACHER" }
-                """;
+    @Nested
+    @DisplayName("PUT /api/v1/users/{id}")
+    class UpdateUserTests {
 
-        mockMvc.perform(post("/api/v1/users")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
-                .andExpect(status().isCreated()) // 201
-                .andExpect(jsonPath("$.status").value(201))
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.username").value("newheadteacher"))
-                .andExpect(jsonPath("$.data.role").value("HEAD_TEACHER"));
+        @Test
+        @DisplayName("ADMIN - Should update user's name and role")
+        void adminShouldUpdateUser() throws Exception {
+            UpdateUserRequest request = new UpdateUserRequest(
+                    "Updated Name", UserRole.HEAD_TEACHER, null
+            );
+
+            mockMvc.perform(put("/api/v1/users/" + teacherUser.getId())
+                            .header("Authorization", "Bearer " + adminToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.fullName").value("Updated Name"))
+                    .andExpect(jsonPath("$.data.role").value("HEAD_TEACHER"));
+        }
+
+        @Test
+        @DisplayName("ADMIN - Should update user's password when provided")
+        void adminShouldUpdatePassword() throws Exception {
+            UpdateUserRequest request = new UpdateUserRequest(
+                    "Test TEACHER", UserRole.TEACHER, "NewPassword123!"
+            );
+
+            mockMvc.perform(put("/api/v1/users/" + teacherUser.getId())
+                            .header("Authorization", "Bearer " + adminToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk());
+
+            // Verify the new password works
+            loginAndGetToken("teacher_test", "NewPassword123!");
+        }
+
+        @Test
+        @DisplayName("TEACHER - Should be forbidden from updating users")
+        void teacherShouldBeForbidden() throws Exception {
+            UpdateUserRequest request = new UpdateUserRequest(
+                    "Name", UserRole.TEACHER, null
+            );
+
+            mockMvc.perform(put("/api/v1/users/" + headTeacherUser.getId())
+                            .header("Authorization", "Bearer " + teacherToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isForbidden());
+        }
+    }
+
+    @Nested
+    @DisplayName("PATCH /api/v1/users/{id}/deactivate")
+    class DeactivateUserTests {
+
+        @Test
+        @DisplayName("ADMIN - Should deactivate another user")
+        void adminShouldDeactivateUser() throws Exception {
+            mockMvc.perform(patch("/api/v1/users/" + teacherUser.getId() + "/deactivate")
+                            .header("Authorization", "Bearer " + adminToken))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.isActive").value(false));
+        }
+
+        @Test
+        @DisplayName("ADMIN - Should not be able to deactivate themselves")
+        void adminShouldNotDeactivateSelf() throws Exception {
+            mockMvc.perform(patch("/api/v1/users/" + adminUser.getId() + "/deactivate")
+                            .header("Authorization", "Bearer " + adminToken))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error.code").value("USER_003"));
+        }
+
+        @Test
+        @DisplayName("HEAD_TEACHER - Should be forbidden from deactivating users")
+        void headTeacherShouldBeForbidden() throws Exception {
+            mockMvc.perform(patch("/api/v1/users/" + teacherUser.getId() + "/deactivate")
+                            .header("Authorization", "Bearer " + headTeacherToken))
+                    .andExpect(status().isForbidden());
+        }
     }
 }

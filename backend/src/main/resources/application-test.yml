@@ -1,0 +1,14 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  liquibase:
+    enabled: false
+  security:
+    jwt:
+      secret-key: dGVzdC1zZWNyZXQta2V5LWZvci1pbnRlZ3JhdGlvbi10ZXN0cy1vbmx5LTEyMzQ1Njc4OTA=
+      expiration-time: 3600000
+
+app:
+  seed:
+    enabled: false

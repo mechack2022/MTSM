@@ -4,6 +4,7 @@ import com.school.attendance.common.api.ApiResponse;
 import com.school.attendance.common.api.MessageKey;
 import com.school.attendance.common.api.MessageResolver;
 import com.school.attendance.user.dto.CreateUserRequest;
+import com.school.attendance.user.dto.UpdateUserRequest;
 import com.school.attendance.user.dto.UserResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -13,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -52,5 +54,31 @@ public class UserController {
                         httpRequest.getRequestURI()
                 )
         );
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_TEACHER')")
+    public ResponseEntity<ApiResponse<UserResponse>> getUserById(@PathVariable UUID id, HttpServletRequest req) {
+        return ResponseEntity.ok(ApiResponse.success(200, messageResolver.getMessage(MessageKey.USER_GET_SUCCESS), userService.getUserById(id), req.getRequestURI()));
+    }
+
+
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<UserResponse>> getCurrentUser(HttpServletRequest req) {
+        return ResponseEntity.ok(ApiResponse.success(200, messageResolver.getMessage(MessageKey.USER_ME_SUCCESS), userService.getCurrentUser(), req.getRequestURI()));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<UserResponse>> updateUser(
+            @PathVariable UUID id, @Valid @RequestBody UpdateUserRequest request, HttpServletRequest req) {
+        return ResponseEntity.ok(ApiResponse.success(200, messageResolver.getMessage(MessageKey.USER_UPDATE_SUCCESS),
+                userService.updateUser(id, request), req.getRequestURI()));
+    }
+
+    @PatchMapping("/{id}/deactivate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<UserResponse>> deactivateUser(@PathVariable UUID id, HttpServletRequest req) {
+        return ResponseEntity.ok(ApiResponse.success(200, messageResolver.getMessage(MessageKey.USER_DEACTIVATE_SUCCESS), userService.deactivateUser(id), req.getRequestURI()));
     }
 }

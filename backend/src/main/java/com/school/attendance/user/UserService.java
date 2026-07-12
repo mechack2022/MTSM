@@ -5,11 +5,14 @@ import com.school.attendance.common.exception.BusinessException;
 import com.school.attendance.school.SchoolRepository;
 import com.school.attendance.school.entity.School;
 import com.school.attendance.user.dto.CreateUserRequest;
+import com.school.attendance.user.dto.UpdateUserRequest;
 import com.school.attendance.user.dto.UserResponse;
 import com.school.attendance.user.entity.AppUser;
 import com.school.attendance.user.mapper.UserMapper;
 import com.school.attendance.user.repository.AppUserRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import java.util.List;
@@ -56,4 +59,49 @@ public class UserService {
                 .map(School::getId)
                 .orElseThrow(() -> new BusinessException(MessageKey.INTERNAL_ERROR));
     }
+
+
+    public UserResponse getUserById(UUID id) {
+        return userRepository.findById(id)
+                .map(userMapper::toDto)
+                .orElseThrow(() -> new BusinessException(MessageKey.USER_NOT_FOUND));
+    }
+
+    public UserResponse getCurrentUser() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByUsername(username)
+                .map(userMapper::toDto)
+                .orElseThrow(() -> new BusinessException(MessageKey.USER_NOT_FOUND));
+    }
+
+
+    @Transactional
+    public UserResponse updateUser(UUID id, UpdateUserRequest request) {
+        AppUser user = userRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(MessageKey.USER_NOT_FOUND));
+        user.setFullName(request.fullName());
+        user.setRole(request.role());
+
+        if (request.newPassword() != null && !request.newPassword().isBlank()) {
+            user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        }
+
+        return userMapper.toDto(userRepository.save(user));
+    }
+
+
+    @Transactional
+    public UserResponse deactivateUser(UUID id) {
+        AppUser user = userRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(MessageKey.USER_NOT_FOUND));
+        // Prevent Admin from locking themselves out
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        if (user.getUsername().equals(currentUsername)) {
+            throw new BusinessException(MessageKey.USER_CANNOT_DEACTIVATE_SELF);
+        }
+
+        user.setIsActive(false);
+        return userMapper.toDto(userRepository.save(user));
+    }
+
 }

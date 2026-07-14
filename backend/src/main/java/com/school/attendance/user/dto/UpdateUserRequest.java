@@ -12,5 +12,6 @@ public record UpdateUserRequest(
         @NotNull(message = "Role is required")
         UserRole role,
 
-        String newPassword
+        String newPassword,
+        String username
 ) {}

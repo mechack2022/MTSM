@@ -81,4 +81,19 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserResponse>> deactivateUser(@PathVariable UUID id, HttpServletRequest req) {
         return ResponseEntity.ok(ApiResponse.success(200, messageResolver.getMessage(MessageKey.USER_DEACTIVATE_SUCCESS), userService.deactivateUser(id), req.getRequestURI()));
     }
+
+    @PatchMapping("/{id}/activate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<UserResponse>> activateUser(
+            @PathVariable UUID id, HttpServletRequest req) {
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        200,
+                        messageResolver.getMessage(MessageKey.USER_ACTIVATE_SUCCESS),
+                        userService.activateUser(id),
+                        req.getRequestURI()
+                )
+        );
+    }
 }

@@ -79,13 +79,19 @@ public class UserService {
     public UserResponse updateUser(UUID id, UpdateUserRequest request) {
         AppUser user = userRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(MessageKey.USER_NOT_FOUND));
+        userRepository.findByUsername(request.username()) // Note: Add username to UpdateUserRequest if you want to allow username changes
+                .ifPresent(existingUser -> {
+                    if (!existingUser.getId().equals(id)) {
+                        throw new BusinessException(MessageKey.USER_ALREADY_EXISTS);
+                    }
+                });
+
         user.setFullName(request.fullName());
         user.setRole(request.role());
 
         if (request.newPassword() != null && !request.newPassword().isBlank()) {
             user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
         }
-
         return userMapper.toDto(userRepository.save(user));
     }
 
@@ -99,9 +105,19 @@ public class UserService {
         if (user.getUsername().equals(currentUsername)) {
             throw new BusinessException(MessageKey.USER_CANNOT_DEACTIVATE_SELF);
         }
-
         user.setIsActive(false);
         return userMapper.toDto(userRepository.save(user));
+    }
+
+    @Transactional
+    public UserResponse activateUser(UUID id) {
+        AppUser user = userRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(MessageKey.USER_NOT_FOUND));
+        if (!user.getIsActive()) {
+            user.setIsActive(true);
+            return userMapper.toDto(userRepository.save(user));
+        }
+        return userMapper.toDto(user);
     }
 
 }

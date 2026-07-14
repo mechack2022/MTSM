@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- ===================================================================== -->
+    <!-- 002: Phase 2 - School Details & Class/Section Management             -->
+    <!-- ===================================================================== -->
+
+    <!-- 1. Add new columns to school table -->
+    <changeSet id="002-add-school-profile-fields" author="system">
+        <comment>Add academic year, term, and contact info to school table (Phase 2)</comment>
+
+        <addColumn tableName="school">
+            <column name="academic_year" type="varchar(20)"/>
+            <column name="current_term" type="varchar(50)"/>
+            <column name="phone" type="varchar(50)"/>
+            <column name="email" type="varchar(255)"/>
+            <column name="logo_url" type="varchar(500)"/>
+        </addColumn>
+
+        <rollback>
+            <dropColumn tableName="school" columnName="academic_year"/>
+            <dropColumn tableName="school" columnName="current_term"/>
+            <dropColumn tableName="school" columnName="phone"/>
+            <dropColumn tableName="school" columnName="email"/>
+            <dropColumn tableName="school" columnName="logo_url"/>
+        </rollback>
+    </changeSet>
+
+    <!-- 2. Create class_section table -->
+    <changeSet id="002-create-class-section-table" author="system">
+        <comment>Create class_section table for structured class management (Phase 2)</comment>
+
+        <createTable tableName="class_section">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="school_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+            <column name="name" type="varchar(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="grade_level" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="academic_year" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="class_teacher_id" type="uuid"/>
+            <column name="capacity" type="integer"/>
+            <column name="is_active" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+                baseTableName="class_section"
+                baseColumnNames="school_id"
+                referencedTableName="school"
+                referencedColumnNames="id"
+                constraintName="fk_class_section_school"
+                onDelete="CASCADE"/>
+
+        <addForeignKeyConstraint
+                baseTableName="class_section"
+                baseColumnNames="class_teacher_id"
+                referencedTableName="app_user"
+                referencedColumnNames="id"
+                constraintName="fk_class_section_teacher"
+                onDelete="SET NULL"/>
+
+        <addUniqueConstraint
+                tableName="class_section"
+                columnNames="school_id, name, academic_year"
+                constraintName="uk_class_section_school_name_year"/>
+
+        <createIndex tableName="class_section" indexName="idx_class_section_school">
+            <column name="school_id"/>
+        </createIndex>
+
+        <createIndex tableName="class_section" indexName="idx_class_section_academic_year">
+            <column name="academic_year"/>
+        </createIndex>
+
+        <rollback>
+            <dropTable tableName="class_section"/>
+        </rollback>
+    </changeSet>
+
+    <!-- 3. Add class_section_id to enrollment table -->
+    <changeSet id="002-add-class-section-to-enrollment" author="system">
+        <comment>Add class_section_id column to enrollment table (Phase 2)</comment>
+
+        <addColumn tableName="enrollment">
+            <column name="class_section_id" type="uuid"/>
+        </addColumn>
+
+        <rollback>
+            <dropColumn tableName="enrollment" columnName="class_section_id"/>
+        </rollback>
+    </changeSet>
+
+    <!-- 4. Data migration: populate class_section from existing enrollments -->
+    <changeSet id="002-migrate-enrollment-data" author="system">
+        <comment>Migrate existing enrollment data to class_section table</comment>
+
+        <sql>
+            INSERT INTO class_section (id, school_id, name, grade_level, academic_year, is_active)
+            SELECT
+                gen_random_uuid(),
+                l.school_id,
+                e.class_name,
+                e.grade_level,
+                e.academic_year,
+                true
+            FROM enrollment e
+                     JOIN learner l ON e.learner_id = l.id
+            GROUP BY l.school_id, e.class_name, e.grade_level, e.academic_year;
+
+            -- 2. Update enrollments (Postgres requires comma-separated tables in FROM, not JOIN)
+            UPDATE enrollment e
+            SET class_section_id = cs.id
+                FROM learner l, class_section cs
+            WHERE e.learner_id = l.id
+              AND l.school_id = cs.school_id
+              AND e.class_name = cs.name
+              AND e.grade_level = cs.grade_level
+              AND e.academic_year = cs.academic_year;
+        </sql>
+
+        <rollback>
+            <sql>
+                UPDATE enrollment SET class_section_id = NULL;
+                DELETE FROM class_section;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <!-- 5. Make class_section_id NOT NULL and add foreign key -->
+    <changeSet id="002-finalize-enrollment-class-section" author="system">
+        <comment>Make class_section_id NOT NULL and add foreign key constraint</comment>
+
+        <addNotNullConstraint tableName="enrollment" columnName="class_section_id"/>
+
+        <addForeignKeyConstraint
+                baseTableName="enrollment"
+                baseColumnNames="class_section_id"
+                referencedTableName="class_section"
+                referencedColumnNames="id"
+                constraintName="fk_enrollment_class_section"
+                onDelete="CASCADE"/>
+
+        <createIndex tableName="enrollment" indexName="idx_enrollment_class_section">
+            <column name="class_section_id"/>
+        </createIndex>
+
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="enrollment" constraintName="fk_enrollment_class_section"/>
+            <dropNotNullConstraint tableName="enrollment" columnName="class_section_id"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

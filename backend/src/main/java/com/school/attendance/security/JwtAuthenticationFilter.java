@@ -32,7 +32,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain) throws ServletException, IOException {
 
         final String authHeader = request.getHeader("Authorization");
-        log.debug("🔍 Authorization Header received: {}", authHeader);
+//        log.debug("🔍 Authorization Header received: {}", authHeader);
 
         // 1. Check if header exists and starts with "Bearer "
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -45,8 +45,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         try {
             final String username = jwtService.extractUsername(jwt);
-            log.info("🔑 Extracted username from token: {}", username);
-
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
                 log.info("User loaded from DB. Role: {}", userDetails.getAuthorities());

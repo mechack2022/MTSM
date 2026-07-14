@@ -7,6 +7,5 @@ import java.util.UUID;
 
 public interface SchoolRepository extends JpaRepository<School, UUID> {
     boolean existsByCode(String code);
-
     Optional<School> findFirstByOrderByIdAsc();
 }

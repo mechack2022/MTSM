@@ -23,6 +23,21 @@ public class School {
     @Column(length = 500)
     private String address;
 
+    @Column(name = "academic_year", length = 20)
+    private String academicYear;
+
+    @Column(name = "current_term", length = 50)
+    private String currentTerm;
+
+    @Column(length = 50)
+    private String phone;
+
+    @Column(length = 255)
+    private String email;
+
+    @Column(name = "logo_url", length = 500)
+    private String logoUrl;
+
     @Builder.Default
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();

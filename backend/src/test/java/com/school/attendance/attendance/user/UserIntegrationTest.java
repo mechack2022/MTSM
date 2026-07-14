@@ -182,7 +182,7 @@ class UserIntegrationTest extends BaseIntegrationTest {
         @DisplayName("ADMIN - Should update user's name and role")
         void adminShouldUpdateUser() throws Exception {
             UpdateUserRequest request = new UpdateUserRequest(
-                    "Updated Name", UserRole.HEAD_TEACHER, null
+                    "Updated Name", UserRole.HEAD_TEACHER, null,"updated_username"
             );
 
             mockMvc.perform(put("/api/v1/users/" + teacherUser.getId())
@@ -198,7 +198,7 @@ class UserIntegrationTest extends BaseIntegrationTest {
         @DisplayName("ADMIN - Should update user's password when provided")
         void adminShouldUpdatePassword() throws Exception {
             UpdateUserRequest request = new UpdateUserRequest(
-                    "Test TEACHER", UserRole.TEACHER, "NewPassword123!"
+                    "Test TEACHER", UserRole.TEACHER, "NewPassword123!", "updated_usermame"
             );
 
             mockMvc.perform(put("/api/v1/users/" + teacherUser.getId())
@@ -215,7 +215,7 @@ class UserIntegrationTest extends BaseIntegrationTest {
         @DisplayName("TEACHER - Should be forbidden from updating users")
         void teacherShouldBeForbidden() throws Exception {
             UpdateUserRequest request = new UpdateUserRequest(
-                    "Name", UserRole.TEACHER, null
+                    "Name", UserRole.TEACHER, null, "updated_username"
             );
 
             mockMvc.perform(put("/api/v1/users/" + headTeacherUser.getId())

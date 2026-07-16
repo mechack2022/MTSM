@@ -3,6 +3,7 @@ package com.school.attendance.school.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import java.util.UUID;
 
 public record SchoolRequest(
         @NotBlank(message = "School name is required")
@@ -16,11 +17,8 @@ public record SchoolRequest(
         @Size(max = 500)
         String address,
 
-        @Size(max = 20)
-        String academicYear,
-
-        @Size(max = 50)
-        String currentTerm,
+        UUID academicYearId,
+        UUID currentTermId,
 
         @Size(max = 50)
         String phone,

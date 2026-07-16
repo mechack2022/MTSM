@@ -1,14 +1,20 @@
 package com.school.attendance.school.entity;
 
+import com.school.attendance.common.entity.BaseAuditableEntity;
 import jakarta.persistence.*;
 import lombok.*;
-import java.time.Instant;
-import java.util.UUID;
+import lombok.experimental.SuperBuilder;
 
+import java.util.UUID;
 @Entity
 @Table(name = "school")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
-public class School {
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@SuperBuilder
+@EqualsAndHashCode(callSuper = true)
+public class School extends BaseAuditableEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -23,11 +29,11 @@ public class School {
     @Column(length = 500)
     private String address;
 
-    @Column(name = "academic_year", length = 20)
-    private String academicYear;
+    @Column(name = "academic_year_id")
+    private UUID academicYearId;
 
-    @Column(name = "current_term", length = 50)
-    private String currentTerm;
+    @Column(name = "current_term_id")
+    private UUID currentTermId;
 
     @Column(length = 50)
     private String phone;
@@ -37,12 +43,4 @@ public class School {
 
     @Column(name = "logo_url", length = 500)
     private String logoUrl;
-
-    @Builder.Default
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt = Instant.now();
-
-    @Builder.Default
-    @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt = Instant.now();
 }

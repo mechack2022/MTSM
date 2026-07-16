@@ -4,6 +4,8 @@ import com.school.attendance.attendance.BaseIntegrationTest;
 import com.school.attendance.classsection.ClassSectionRepository;
 import com.school.attendance.classsection.dto.ClassSectionRequest;
 import com.school.attendance.classsection.entity.ClassSection;
+import com.school.attendance.common.entity.CodeSet;
+import com.school.attendance.common.enums.CodeSetGroup;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -30,8 +32,8 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
         void adminShouldCreateClass() throws Exception {
             ClassSectionRequest request = new ClassSectionRequest(
                     "Grade 1 - Section A",
-                    "Grade 1",
-                    "2026",
+                    testGradeLevelId,
+                    testAcademicYearId,
                     teacherUser.getId(),
                     30
             );
@@ -44,8 +46,10 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
                     .andExpect(jsonPath("$.status").value(201))
                     .andExpect(jsonPath("$.success").value(true))
                     .andExpect(jsonPath("$.data.name").value("Grade 1 - Section A"))
-                    .andExpect(jsonPath("$.data.gradeLevel").value("Grade 1"))
-                    .andExpect(jsonPath("$.data.academicYear").value("2026"))
+                    .andExpect(jsonPath("$.data.gradeLevelId").value(testGradeLevelId.toString()))
+                    .andExpect(jsonPath("$.data.gradeLevelDisplayName").value("Grade 1"))
+                    .andExpect(jsonPath("$.data.academicYearId").value(testAcademicYearId.toString()))
+                    .andExpect(jsonPath("$.data.academicYearDisplayName").value("2025/2026"))
                     .andExpect(jsonPath("$.data.classTeacherId").value(teacherUser.getId().toString()))
                     .andExpect(jsonPath("$.data.classTeacherName").value(teacherUser.getFullName()))
                     .andExpect(jsonPath("$.data.capacity").value(30))
@@ -57,8 +61,8 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
         void headTeacherShouldCreateClass() throws Exception {
             ClassSectionRequest request = new ClassSectionRequest(
                     "Grade 2 - Section B",
-                    "Grade 2",
-                    "2026",
+                    testGradeLevelId,
+                    testAcademicYearId,
                     null,
                     25
             );
@@ -76,8 +80,8 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
         void adminShouldGet409ForDuplicate() throws Exception {
             ClassSectionRequest request = new ClassSectionRequest(
                     "Duplicate Class",
-                    "Grade 1",
-                    "2026",
+                    testGradeLevelId,
+                    testAcademicYearId,
                     null,
                     30
             );
@@ -101,18 +105,28 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("ADMIN - Should allow same class name in different academic year")
         void adminShouldAllowSameNameDifferentYear() throws Exception {
+            // Create a second academic year for this test
+            CodeSet academicYear2 = codeSetRepository.save(CodeSet.builder()
+                    .schoolId(testSchool.getId())
+                    .codeSetGroup(CodeSetGroup.ACADEMIC_YEAR)
+                    .code("2025")
+                    .displayName("2024/2025")
+                    .sortOrder(2)
+                    .isActive(true)
+                    .build());
+
             ClassSectionRequest requestYear1 = new ClassSectionRequest(
                     "Grade 1 - Section A",
-                    "Grade 1",
-                    "2025",
+                    testGradeLevelId,
+                    academicYear2.getId(),
                     null,
                     30
             );
 
             ClassSectionRequest requestYear2 = new ClassSectionRequest(
                     "Grade 1 - Section A",
-                    "Grade 1",
-                    "2026",
+                    testGradeLevelId,
+                    testAcademicYearId,
                     null,
                     30
             );
@@ -135,8 +149,8 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
         void adminShouldGet400ForInvalidTeacher() throws Exception {
             ClassSectionRequest request = new ClassSectionRequest(
                     "Grade 1 - Section A",
-                    "Grade 1",
-                    "2026",
+                    testGradeLevelId,
+                    testAcademicYearId,
                     UUID.randomUUID(), // Non-existent teacher
                     30
             );
@@ -155,8 +169,8 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
             String malformedJson = """
                 {
                     "name": "Grade 1",
-                    "gradeLevel": "Grade 1",
-                    "academicYear": "2026",
+                    "gradeLevelId": "not-a-uuid",
+                    "academicYearId": "not-a-uuid",
                     "classTeacherId": "not-a-uuid",
                     "capacity": 30
                 }
@@ -174,7 +188,7 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
         @DisplayName("ADMIN - Should return 400 for missing required fields")
         void adminShouldGet400ForMissingFields() throws Exception {
             ClassSectionRequest request = new ClassSectionRequest(
-                    "", "", "", null, null
+                    "", null, null, null, null
             );
 
             mockMvc.perform(post("/api/v1/classes")
@@ -189,7 +203,7 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
         @DisplayName("TEACHER - Should be forbidden (403) from creating classes")
         void teacherShouldBeForbidden() throws Exception {
             ClassSectionRequest request = new ClassSectionRequest(
-                    "Grade 1", "Grade 1", "2026", null, 30
+                    "Grade 1", testGradeLevelId, testAcademicYearId, null, 30
             );
 
             mockMvc.perform(post("/api/v1/classes")
@@ -203,7 +217,7 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
         @DisplayName("Unauthenticated - Should return 401")
         void unauthenticatedShouldGet401() throws Exception {
             ClassSectionRequest request = new ClassSectionRequest(
-                    "Grade 1", "Grade 1", "2026", null, 30
+                    "Grade 1", testGradeLevelId, testAcademicYearId, null, 30
             );
 
             mockMvc.perform(post("/api/v1/classes")
@@ -220,9 +234,9 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("ADMIN - Should list all active classes")
         void adminShouldListAllClasses() throws Exception {
-            createTestClass("Grade 1 - A", "2026");
-            createTestClass("Grade 2 - A", "2026");
-            createTestClass("Grade 3 - A", "2025");
+            createTestClass("Grade 1 - A", testAcademicYearId, testGradeLevelId);
+            createTestClass("Grade 1 - B", testAcademicYearId, testGradeLevelId);
+            createTestClass("Grade 2 - A", testAcademicYearId, testGradeLevelId);
 
             mockMvc.perform(get("/api/v1/classes")
                             .header("Authorization", "Bearer " + adminToken))
@@ -234,22 +248,31 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("ADMIN - Should filter classes by academic year")
         void adminShouldFilterByAcademicYear() throws Exception {
-            createTestClass("Grade 1 - A", "2026");
-            createTestClass("Grade 2 - A", "2026");
-            createTestClass("Grade 3 - A", "2025");
+            createTestClass("Grade 1 - A", testAcademicYearId, testGradeLevelId);
+            createTestClass("Grade 1 - B", testAcademicYearId, testGradeLevelId);
+
+            CodeSet academicYear2 = codeSetRepository.save(CodeSet.builder()
+                    .schoolId(testSchool.getId())
+                    .codeSetGroup(CodeSetGroup.ACADEMIC_YEAR)
+                    .code("2025")
+                    .displayName("2024/2025")
+                    .sortOrder(2)
+                    .isActive(true)
+                    .build());
+            createTestClass("Grade 2 - A", academicYear2.getId(), testGradeLevelId);
 
             mockMvc.perform(get("/api/v1/classes")
-                            .param("academicYear", "2026")
+                            .param("academicYearId", testAcademicYearId.toString()) // ✅ Updated param name
                             .header("Authorization", "Bearer " + adminToken))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data", hasSize(2)))
-                    .andExpect(jsonPath("$.data[*].academicYear", everyItem(is("2026"))));
+                    .andExpect(jsonPath("$.data[*].academicYearId", everyItem(is(testAcademicYearId.toString()))));
         }
 
         @Test
         @DisplayName("TEACHER - Should list classes")
         void teacherShouldListClasses() throws Exception {
-            createTestClass("Grade 1 - A", "2026");
+            createTestClass("Grade 1 - A", testAcademicYearId, testGradeLevelId);
 
             mockMvc.perform(get("/api/v1/classes")
                             .header("Authorization", "Bearer " + teacherToken))
@@ -265,7 +288,7 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("ADMIN - Should retrieve a specific class")
         void adminShouldGetClassById() throws Exception {
-            ClassSection classSection = createTestClass("Grade 1 - A", "2026");
+            ClassSection classSection = createTestClass("Grade 1 - A", testAcademicYearId, testGradeLevelId);
 
             mockMvc.perform(get("/api/v1/classes/" + classSection.getId())
                             .header("Authorization", "Bearer " + adminToken))
@@ -293,9 +316,6 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==========================================
-    // PUT /api/v1/classes/{id}
-    // ==========================================
     @Nested
     @DisplayName("PUT /api/v1/classes/{id}")
     class UpdateClassTests {
@@ -303,12 +323,12 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("ADMIN - Should update class successfully")
         void adminShouldUpdateClass() throws Exception {
-            ClassSection classSection = createTestClass("Grade 1 - A", "2026");
+            ClassSection classSection = createTestClass("Grade 1 - A", testAcademicYearId, testGradeLevelId);
 
             ClassSectionRequest request = new ClassSectionRequest(
                     "Grade 1 - Section A (Updated)",
-                    "Grade 1",
-                    "2026",
+                    testGradeLevelId,
+                    testAcademicYearId,
                     teacherUser.getId(),
                     35
             );
@@ -326,12 +346,12 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("ADMIN - Should return 400 when updating with invalid teacher ID")
         void adminShouldGet400ForInvalidTeacherOnUpdate() throws Exception {
-            ClassSection classSection = createTestClass("Grade 1 - A", "2026");
+            ClassSection classSection = createTestClass("Grade 1 - A", testAcademicYearId, testGradeLevelId);
 
             ClassSectionRequest request = new ClassSectionRequest(
                     "Grade 1 - A",
-                    "Grade 1",
-                    "2026",
+                    testGradeLevelId,
+                    testAcademicYearId,
                     UUID.randomUUID(), // Non-existent
                     30
             );
@@ -347,10 +367,10 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("TEACHER - Should be forbidden from updating classes")
         void teacherShouldBeForbidden() throws Exception {
-            ClassSection classSection = createTestClass("Grade 1 - A", "2026");
+            ClassSection classSection = createTestClass("Grade 1 - A", testAcademicYearId, testGradeLevelId);
 
             ClassSectionRequest request = new ClassSectionRequest(
-                    "Updated", "Grade 1", "2026", null, 30
+                    "Updated", testGradeLevelId, testAcademicYearId, null, 30
             );
 
             mockMvc.perform(put("/api/v1/classes/" + classSection.getId())
@@ -361,9 +381,6 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==========================================
-    // PATCH /api/v1/classes/{id}/deactivate
-    // ==========================================
     @Nested
     @DisplayName("PATCH /api/v1/classes/{id}/deactivate")
     class DeactivateClassTests {
@@ -371,7 +388,7 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("ADMIN - Should deactivate a class")
         void adminShouldDeactivateClass() throws Exception {
-            ClassSection classSection = createTestClass("Grade 1 - A", "2026");
+            ClassSection classSection = createTestClass("Grade 1 - A", testAcademicYearId, testGradeLevelId);
 
             mockMvc.perform(patch("/api/v1/classes/" + classSection.getId() + "/deactivate")
                             .header("Authorization", "Bearer " + adminToken))
@@ -382,7 +399,7 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("HEAD_TEACHER - Should deactivate a class")
         void headTeacherShouldDeactivateClass() throws Exception {
-            ClassSection classSection = createTestClass("Grade 1 - A", "2026");
+            ClassSection classSection = createTestClass("Grade 1 - A", testAcademicYearId, testGradeLevelId);
 
             mockMvc.perform(patch("/api/v1/classes/" + classSection.getId() + "/deactivate")
                             .header("Authorization", "Bearer " + headTeacherToken))
@@ -393,7 +410,7 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("TEACHER - Should be forbidden from deactivating classes")
         void teacherShouldBeForbidden() throws Exception {
-            ClassSection classSection = createTestClass("Grade 1 - A", "2026");
+            ClassSection classSection = createTestClass("Grade 1 - A", testAcademicYearId, testGradeLevelId);
 
             mockMvc.perform(patch("/api/v1/classes/" + classSection.getId() + "/deactivate")
                             .header("Authorization", "Bearer " + teacherToken))
@@ -410,9 +427,6 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==========================================
-    // PATCH /api/v1/classes/{id}/activate
-    // ==========================================
     @Nested
     @DisplayName("PATCH /api/v1/classes/{id}/activate")
     class ActivateClassTests {
@@ -420,7 +434,7 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("ADMIN - Should reactivate a deactivated class")
         void adminShouldReactivateClass() throws Exception {
-            ClassSection classSection = createTestClass("Grade 1 - A", "2026");
+            ClassSection classSection = createTestClass("Grade 1 - A", testAcademicYearId, testGradeLevelId);
             classSection.setIsActive(false);
             classSectionRepository.save(classSection);
 
@@ -431,21 +445,21 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("ADMIN - Should be idempotent (already active class stays active)")
-        void adminShouldBeIdempotent() throws Exception {
-            ClassSection classSection = createTestClass("Grade 1 - A", "2026");
+        @DisplayName("ADMIN - Should return 400 if already active (Idempotency check)")
+        void adminShouldGet400IfAlreadyActive() throws Exception {
+            ClassSection classSection = createTestClass("Grade 1 - A", testAcademicYearId, testGradeLevelId);
             // classSection is already active by default
 
             mockMvc.perform(patch("/api/v1/classes/" + classSection.getId() + "/activate")
                             .header("Authorization", "Bearer " + adminToken))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.data.isActive").value(true));
+                    .andExpect(status().isBadRequest()) // ✅ Updated to expect 400
+                    .andExpect(jsonPath("$.error.code").value("CLASS_004"));
         }
 
         @Test
         @DisplayName("TEACHER - Should be forbidden from activating classes")
         void teacherShouldBeForbidden() throws Exception {
-            ClassSection classSection = createTestClass("Grade 1 - A", "2026");
+            ClassSection classSection = createTestClass("Grade 1 - A", testAcademicYearId, testGradeLevelId);
 
             mockMvc.perform(patch("/api/v1/classes/" + classSection.getId() + "/activate")
                             .header("Authorization", "Bearer " + teacherToken))
@@ -453,15 +467,13 @@ class ClassSectionIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==========================================
-    // Helper Methods
-    // ==========================================
-    private ClassSection createTestClass(String name, String academicYear) {
+
+    private ClassSection createTestClass(String name, UUID academicYearId, UUID gradeLevelId) {
         return classSectionRepository.save(ClassSection.builder()
                 .schoolId(testSchool.getId())
                 .name(name)
-                .gradeLevel("Grade 1")
-                .academicYear(academicYear)
+                .gradeLevelId(gradeLevelId)
+                .academicYearId(academicYearId)
                 .capacity(30)
                 .isActive(true)
                 .build());

@@ -1,5 +1,4 @@
 package com.school.attendance.common.exception;
-
 import com.school.attendance.attendance.BaseIntegrationTest;
 import com.school.attendance.classsection.dto.ClassSectionRequest;
 import org.junit.jupiter.api.DisplayName;
@@ -37,11 +36,12 @@ class GlobalExceptionHandlerIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("Should handle malformed UUID in request body with 400 VALIDATION_002")
         void shouldHandleMalformedUUIDInBody() throws Exception {
+            // This JSON string is intentionally malformed to trigger Jackson deserialization errors
             String body = """
                 {
                     "name": "Grade 1",
-                    "gradeLevel": "Grade 1",
-                    "academicYear": "2026",
+                    "gradeLevelId": "not-a-uuid",
+                    "academicYearId": "not-a-uuid",
                     "classTeacherId": "not-a-uuid",
                     "capacity": 30
                 }
@@ -68,10 +68,11 @@ class GlobalExceptionHandlerIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("Should handle non-existent teacher ID with 400 CLASS_003")
         void shouldHandleNonExistentTeacher() throws Exception {
+            // ✅ FIXED: Use the seeded UUIDs from BaseIntegrationTest instead of Strings
             ClassSectionRequest request = new ClassSectionRequest(
                     "Grade 1",
-                    "Grade 1",
-                    "2026",
+                    testGradeLevelId,
+                    testAcademicYearId,
                     UUID.randomUUID(),
                     30
             );

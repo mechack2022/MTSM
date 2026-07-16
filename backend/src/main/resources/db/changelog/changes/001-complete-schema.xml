@@ -1,0 +1,479 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- 1. School Table -->
+    <changeSet id="001-create-school-table" author="system">
+        <comment>Create school table - single school for pilot</comment>
+        <createTable tableName="school">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="code" type="varchar(50)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="address" type="varchar(500)"/>
+            <column name="academic_year_id" type="uuid"/>
+            <column name="current_term_id" type="uuid"/>
+            <column name="phone" type="varchar(50)"/>
+            <column name="email" type="varchar(255)"/>
+            <column name="logo_url" type="varchar(500)"/>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by" type="uuid"/>
+            <column name="updated_by" type="uuid"/>
+        </createTable>
+    </changeSet>
+
+    <!-- 2. Unified Code Set Table (Configuration) -->
+    <changeSet id="001-create-code-set-table" author="system">
+        <comment>Create unified code_set table for all school configurations (grade levels, attendance statuses, etc.)</comment>
+
+        <createTable tableName="code_set">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="school_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+            <column name="code_set_group" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="code" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="display_name" type="varchar(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="varchar(500)"/>
+            <column name="attributes" type="jsonb"/>
+            <column name="sort_order" type="integer">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_active" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by" type="uuid"/>
+            <column name="updated_by" type="uuid"/>
+        </createTable>
+    </changeSet>
+
+    <!-- 3. App User Table -->
+    <changeSet id="001-create-app-user-table" author="system">
+        <comment>Create app_user table for authentication and role-based access</comment>
+        <createTable tableName="app_user">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="school_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+            <column name="username" type="varchar(100)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="password_hash" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="full_name" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="role" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_active" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by" type="uuid"/>
+            <column name="updated_by" type="uuid"/>
+        </createTable>
+    </changeSet>
+
+    <!-- 4. Learner Table -->
+    <changeSet id="001-create-learner-table" author="system">
+        <comment>Create learner table with grade_level as foreign key to code_set</comment>
+        <createTable tableName="learner">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="school_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+            <column name="first_name" type="varchar(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_name" type="varchar(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="student_number" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="grade_level_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+            <column name="date_of_birth" type="date"/>
+            <column name="sex" type="varchar(10)"/>
+            <column name="is_active" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by" type="uuid"/>
+            <column name="updated_by" type="uuid"/>
+        </createTable>
+    </changeSet>
+
+    <!-- 5. Class Section Table -->
+    <changeSet id="001-create-class-section-table" author="system">
+        <comment>Create class_section table with grade_level and academic_year as foreign keys</comment>
+        <createTable tableName="class_section">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="school_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+            <column name="name" type="varchar(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="grade_level_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+            <column name="academic_year_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+            <column name="class_teacher_id" type="uuid"/>
+            <column name="capacity" type="integer"/>
+            <column name="is_active" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by" type="uuid"/>
+            <column name="updated_by" type="uuid"/>
+        </createTable>
+    </changeSet>
+
+    <!-- 6. Enrollment Table -->
+    <changeSet id="001-create-enrollment-table" author="system">
+        <comment>Create enrollment table with academic_year as foreign key</comment>
+        <createTable tableName="enrollment">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="learner_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+            <column name="class_section_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+            <column name="academic_year_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+            <column name="enrollment_date" type="date">
+                <constraints nullable="false"/>
+            </column>
+            <column name="withdrawal_date" type="date"/>
+            <column name="status" type="varchar(20)" defaultValue="ACTIVE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by" type="uuid"/>
+            <column name="updated_by" type="uuid"/>
+        </createTable>
+    </changeSet>
+
+    <!-- 7. Attendance Table -->
+    <changeSet id="001-create-attendance-table" author="system">
+        <comment>Create attendance table with attendance_status and absence_reason as foreign keys</comment>
+        <createTable tableName="attendance">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="learner_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+            <column name="attendance_date" type="date">
+                <constraints nullable="false"/>
+            </column>
+            <column name="attendance_status_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+            <column name="absence_reason_id" type="uuid"/>
+            <column name="notes" type="text"/>
+            <column name="recorded_by" type="uuid"/>
+            <column name="recorded_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="change_id" type="uuid">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="sync_status" type="varchar(20)" defaultValue="PENDING">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by" type="uuid"/>
+            <column name="updated_by" type="uuid"/>
+        </createTable>
+    </changeSet>
+
+    <!-- 8. Change Log Table -->
+    <changeSet id="001-create-change-log-table" author="system">
+        <comment>Create change_log table - audit trail for sync</comment>
+        <createTable tableName="change_log">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="entity_type" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="entity_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+            <column name="operation_type" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="change_id" type="uuid">
+                <constraints nullable="false"/>
+            </column>
+            <column name="changed_data" type="jsonb">
+                <constraints nullable="false"/>
+            </column>
+            <column name="previous_data" type="jsonb"/>
+            <column name="changed_by" type="uuid"/>
+            <column name="sync_status" type="varchar(20)" defaultValue="PENDING">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by" type="uuid"/>
+            <column name="updated_by" type="uuid"/>
+        </createTable>
+    </changeSet>
+
+    <!-- 9. Foreign Key Constraints -->
+    <changeSet id="001-add-foreign-keys" author="system">
+        <comment>Add all foreign key constraints</comment>
+
+        <!-- School foreign keys -->
+        <addForeignKeyConstraint baseTableName="school" baseColumnNames="academic_year_id"
+                                 referencedTableName="code_set" referencedColumnNames="id"
+                                 constraintName="fk_school_academic_year" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="school" baseColumnNames="current_term_id"
+                                 referencedTableName="code_set" referencedColumnNames="id"
+                                 constraintName="fk_school_current_term" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="school" baseColumnNames="created_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_school_created_by" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="school" baseColumnNames="updated_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_school_updated_by" onDelete="SET NULL"/>
+
+        <!-- Code set foreign keys -->
+        <addForeignKeyConstraint baseTableName="code_set" baseColumnNames="school_id"
+                                 referencedTableName="school" referencedColumnNames="id"
+                                 constraintName="fk_code_set_school" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="code_set" baseColumnNames="created_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_code_set_created_by" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="code_set" baseColumnNames="updated_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_code_set_updated_by" onDelete="SET NULL"/>
+
+        <!-- App user foreign keys -->
+        <addForeignKeyConstraint baseTableName="app_user" baseColumnNames="school_id"
+                                 referencedTableName="school" referencedColumnNames="id"
+                                 constraintName="fk_app_user_school" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="app_user" baseColumnNames="created_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_app_user_created_by" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="app_user" baseColumnNames="updated_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_app_user_updated_by" onDelete="SET NULL"/>
+
+        <!-- Learner foreign keys -->
+        <addForeignKeyConstraint baseTableName="learner" baseColumnNames="school_id"
+                                 referencedTableName="school" referencedColumnNames="id"
+                                 constraintName="fk_learner_school" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="learner" baseColumnNames="grade_level_id"
+                                 referencedTableName="code_set" referencedColumnNames="id"
+                                 constraintName="fk_learner_grade_level" onDelete="RESTRICT"/>
+        <addForeignKeyConstraint baseTableName="learner" baseColumnNames="created_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_learner_created_by" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="learner" baseColumnNames="updated_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_learner_updated_by" onDelete="SET NULL"/>
+
+        <!-- Class section foreign keys -->
+        <addForeignKeyConstraint baseTableName="class_section" baseColumnNames="school_id"
+                                 referencedTableName="school" referencedColumnNames="id"
+                                 constraintName="fk_class_section_school" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="class_section" baseColumnNames="grade_level_id"
+                                 referencedTableName="code_set" referencedColumnNames="id"
+                                 constraintName="fk_class_section_grade_level" onDelete="RESTRICT"/>
+        <addForeignKeyConstraint baseTableName="class_section" baseColumnNames="academic_year_id"
+                                 referencedTableName="code_set" referencedColumnNames="id"
+                                 constraintName="fk_class_section_academic_year" onDelete="RESTRICT"/>
+        <addForeignKeyConstraint baseTableName="class_section" baseColumnNames="class_teacher_id"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_class_section_teacher" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="class_section" baseColumnNames="created_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_class_section_created_by" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="class_section" baseColumnNames="updated_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_class_section_updated_by" onDelete="SET NULL"/>
+
+        <!-- Enrollment foreign keys -->
+        <addForeignKeyConstraint baseTableName="enrollment" baseColumnNames="learner_id"
+                                 referencedTableName="learner" referencedColumnNames="id"
+                                 constraintName="fk_enrollment_learner" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="enrollment" baseColumnNames="class_section_id"
+                                 referencedTableName="class_section" referencedColumnNames="id"
+                                 constraintName="fk_enrollment_class_section" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="enrollment" baseColumnNames="academic_year_id"
+                                 referencedTableName="code_set" referencedColumnNames="id"
+                                 constraintName="fk_enrollment_academic_year" onDelete="RESTRICT"/>
+        <addForeignKeyConstraint baseTableName="enrollment" baseColumnNames="created_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_enrollment_created_by" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="enrollment" baseColumnNames="updated_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_enrollment_updated_by" onDelete="SET NULL"/>
+
+        <!-- Attendance foreign keys -->
+        <addForeignKeyConstraint baseTableName="attendance" baseColumnNames="learner_id"
+                                 referencedTableName="learner" referencedColumnNames="id"
+                                 constraintName="fk_attendance_learner" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="attendance" baseColumnNames="attendance_status_id"
+                                 referencedTableName="code_set" referencedColumnNames="id"
+                                 constraintName="fk_attendance_status" onDelete="RESTRICT"/>
+        <addForeignKeyConstraint baseTableName="attendance" baseColumnNames="absence_reason_id"
+                                 referencedTableName="code_set" referencedColumnNames="id"
+                                 constraintName="fk_attendance_absence_reason" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="attendance" baseColumnNames="recorded_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_attendance_recorded_by" onDelete="NO ACTION"/>
+        <addForeignKeyConstraint baseTableName="attendance" baseColumnNames="created_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_attendance_created_by" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="attendance" baseColumnNames="updated_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_attendance_updated_by" onDelete="SET NULL"/>
+
+        <!-- Change log foreign keys -->
+        <addForeignKeyConstraint baseTableName="change_log" baseColumnNames="changed_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_change_log_changed_by" onDelete="NO ACTION"/>
+        <addForeignKeyConstraint baseTableName="change_log" baseColumnNames="created_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_change_log_created_by" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="change_log" baseColumnNames="updated_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_change_log_updated_by" onDelete="SET NULL"/>
+    </changeSet>
+
+    <!-- 10. Unique Constraints -->
+    <changeSet id="001-add-unique-constraints" author="system">
+        <comment>Add unique constraints for data integrity</comment>
+
+        <addUniqueConstraint tableName="code_set"
+                             columnNames="school_id, code_set_group, code"
+                             constraintName="uk_code_set_school_group_code"/>
+        <addUniqueConstraint tableName="learner"
+                             columnNames="school_id, student_number"
+                             constraintName="uk_learner_school_student_number"/>
+        <addUniqueConstraint tableName="class_section"
+                             columnNames="school_id, name, academic_year_id"
+                             constraintName="uk_class_section_school_name_year"/>
+        <addUniqueConstraint tableName="attendance"
+                             columnNames="learner_id, attendance_date"
+                             constraintName="uk_attendance_learner_date"/>
+    </changeSet>
+
+    <!-- 11. Indexes for Performance -->
+    <changeSet id="001-add-indexes" author="system">
+        <comment>Add indexes for query performance</comment>
+
+        <createIndex tableName="code_set" indexName="idx_code_set_school">
+            <column name="school_id"/>
+        </createIndex>
+        <createIndex tableName="code_set" indexName="idx_code_set_group">
+            <column name="code_set_group"/>
+        </createIndex>
+        <createIndex tableName="class_section" indexName="idx_class_section_school">
+            <column name="school_id"/>
+        </createIndex>
+        <createIndex tableName="class_section" indexName="idx_class_section_academic_year">
+            <column name="academic_year_id"/>
+        </createIndex>
+        <createIndex tableName="enrollment" indexName="idx_enrollment_class_section">
+            <column name="class_section_id"/>
+        </createIndex>
+        <createIndex tableName="attendance" indexName="idx_attendance_date">
+            <column name="attendance_date"/>
+        </createIndex>
+        <createIndex tableName="attendance" indexName="idx_attendance_sync_status">
+            <column name="sync_status"/>
+        </createIndex>
+        <createIndex tableName="change_log" indexName="idx_change_log_entity">
+            <column name="entity_type"/>
+            <column name="entity_id"/>
+        </createIndex>
+        <createIndex tableName="change_log" indexName="idx_change_log_sync_status">
+            <column name="sync_status"/>
+        </createIndex>
+
+        <!-- Partial unique index for active enrollments -->
+        <sql>
+            CREATE UNIQUE INDEX uk_enrollment_learner_active_year
+                ON enrollment (learner_id, academic_year_id)
+                WHERE status = 'ACTIVE';
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

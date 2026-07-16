@@ -1,10 +1,26 @@
 package com.school.attendance.common.api;
 
 
+import jakarta.validation.constraints.Null;
 import org.springframework.http.HttpStatus;
 
 public enum MessageKey {
 
+
+    // Code Set Management (Success)
+    CODESET_CREATE_SUCCESS(HttpStatus.CREATED, "codeset.create.success", null),
+    CODESET_LIST_SUCCESS(HttpStatus.OK, "codeset.list.success", null),
+    CODESET_GET_SUCCESS(HttpStatus.OK, "codeset.get.success", null),
+    CODESET_UPDATE_SUCCESS(HttpStatus.OK, "codeset.update.success", null),
+    CODESET_ACTIVATE_SUCCESS(HttpStatus.OK, "codeset.activate.success", null),
+    CODESET_DEACTIVATE_SUCCESS(HttpStatus.OK, "codeset.deactivate.success", null),
+
+    // Code Set Management (Errors)
+    CODESET_ALREADY_EXISTS(HttpStatus.CONFLICT, "codeset.error.already_exists", "CODESET_001"),
+    CODESET_NOT_FOUND(HttpStatus.NOT_FOUND, "codeset.error.not_found", "CODESET_002"),
+    CODESET_ALREADY_ACTIVE(HttpStatus.BAD_REQUEST, "codeset.error.already_active", "CODESET_003"),
+    CODESET_ALREADY_DEACTIVATED(HttpStatus.BAD_REQUEST, "codeset.error.already_deactivated", "CODESET_004"),
+    CODESET_INVALID_GROUP(HttpStatus.BAD_REQUEST, "codeset.error.invalid_group", "CODESET_005"),
     // Authentication
     AUTH_LOGIN_SUCCESS(HttpStatus.OK, "auth.login.success", null),
     AUTH_BAD_CREDENTIALS(HttpStatus.UNAUTHORIZED, "auth.error.bad_credentials", "AUTH_001"),
@@ -39,6 +55,8 @@ public enum MessageKey {
     CLASS_DEACTIVATE_SUCCESS(HttpStatus.OK, "class.deactivate.success", null),
     CLASS_ALREADY_EXISTS(HttpStatus.CONFLICT, "class.error.already_exists", "CLASS_001"),
     CLASS_ACTIVATE_SUCCESS(HttpStatus.OK, "class.activate.success", null),
+    CLASS_ALREADY_ACTIVE(HttpStatus.BAD_REQUEST, "class.error.already_active", "CLASS_004"),
+    CLASS_ALREADY_DEACTIVATED(HttpStatus.BAD_REQUEST, "class.error.already_deactivated", "CLASS_005"),
     CLASS_NOT_FOUND(HttpStatus.NOT_FOUND, "class.error.not_found", "CLASS_002");
 
 

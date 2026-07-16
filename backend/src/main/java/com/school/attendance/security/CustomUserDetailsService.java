@@ -13,10 +13,13 @@ import org.springframework.stereotype.Service;
 import java.util.Collections;
 
 @Service
-@RequiredArgsConstructor
 public class CustomUserDetailsService implements UserDetailsService {
 
     private final AppUserRepository userRepository;
+
+    public CustomUserDetailsService(AppUserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
@@ -26,10 +29,11 @@ public class CustomUserDetailsService implements UserDetailsService {
         if (!appUser.getIsActive()) {
             throw new UsernameNotFoundException("User account is deactivated");
         }
-
-        return new User(
+        return new CustomUserDetails(
+                appUser.getId(),
                 appUser.getUsername(),
                 appUser.getPasswordHash(),
+                appUser.getIsActive(),
                 Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + appUser.getRole().name()))
         );
     }

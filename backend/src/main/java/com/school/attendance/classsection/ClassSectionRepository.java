@@ -6,9 +6,10 @@ import java.util.List;
 import java.util.UUID;
 
 public interface ClassSectionRepository extends JpaRepository<ClassSection, UUID> {
-    List<ClassSection> findBySchoolIdAndAcademicYearAndIsActiveTrue(UUID schoolId, String academicYear);
+    List<ClassSection> findBySchoolIdAndAcademicYearIdAndIsActiveTrue(UUID schoolId, UUID academicYearId);
+    List<ClassSection> findBySchoolIdAndGradeLevelIdAndIsActiveTrue(UUID schoolId, UUID gradeLevelId);
     List<ClassSection> findBySchoolIdAndIsActiveTrue(UUID schoolId);
-    boolean existsBySchoolIdAndNameAndAcademicYear(UUID schoolId, String name, String academicYear);
+    boolean existsBySchoolIdAndNameAndAcademicYearId(UUID schoolId, String name, UUID academicYearId);
     List<ClassSection> findByClassTeacherIdAndIsActiveTrue(UUID classTeacherId);
 
 }

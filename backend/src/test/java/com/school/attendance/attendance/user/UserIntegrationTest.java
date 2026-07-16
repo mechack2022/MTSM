@@ -1,5 +1,6 @@
 package com.school.attendance.attendance.user;
 
+
 import com.school.attendance.attendance.BaseIntegrationTest;
 import com.school.attendance.user.dto.CreateUserRequest;
 import com.school.attendance.user.dto.UpdateUserRequest;
@@ -182,7 +183,7 @@ class UserIntegrationTest extends BaseIntegrationTest {
         @DisplayName("ADMIN - Should update user's name and role")
         void adminShouldUpdateUser() throws Exception {
             UpdateUserRequest request = new UpdateUserRequest(
-                    "Updated Name", UserRole.HEAD_TEACHER, null,"updated_username"
+                    "Updated Name", UserRole.HEAD_TEACHER, null, "teacher_test"
             );
 
             mockMvc.perform(put("/api/v1/users/" + teacherUser.getId())
@@ -198,7 +199,7 @@ class UserIntegrationTest extends BaseIntegrationTest {
         @DisplayName("ADMIN - Should update user's password when provided")
         void adminShouldUpdatePassword() throws Exception {
             UpdateUserRequest request = new UpdateUserRequest(
-                    "Test TEACHER", UserRole.TEACHER, "NewPassword123!", "updated_usermame"
+                    "Test TEACHER", UserRole.TEACHER, "NewPassword123!", "teacher_test"
             );
 
             mockMvc.perform(put("/api/v1/users/" + teacherUser.getId())
@@ -207,7 +208,6 @@ class UserIntegrationTest extends BaseIntegrationTest {
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isOk());
 
-            // Verify the new password works
             loginAndGetToken("teacher_test", "NewPassword123!");
         }
 
@@ -215,7 +215,7 @@ class UserIntegrationTest extends BaseIntegrationTest {
         @DisplayName("TEACHER - Should be forbidden from updating users")
         void teacherShouldBeForbidden() throws Exception {
             UpdateUserRequest request = new UpdateUserRequest(
-                    "Name", UserRole.TEACHER, null, "updated_username"
+                    "Name", UserRole.TEACHER, null, "teacher_test"
             );
 
             mockMvc.perform(put("/api/v1/users/" + headTeacherUser.getId())
@@ -252,6 +252,41 @@ class UserIntegrationTest extends BaseIntegrationTest {
         @DisplayName("HEAD_TEACHER - Should be forbidden from deactivating users")
         void headTeacherShouldBeForbidden() throws Exception {
             mockMvc.perform(patch("/api/v1/users/" + teacherUser.getId() + "/deactivate")
+                            .header("Authorization", "Bearer " + headTeacherToken))
+                    .andExpect(status().isForbidden());
+        }
+    }
+
+    @Nested
+    @DisplayName("PATCH /api/v1/users/{id}/activate")
+    class ActivateUserTests {
+
+        @Test
+        @DisplayName("ADMIN - Should reactivate a deactivated user")
+        void adminShouldReactivateUser() throws Exception {
+            mockMvc.perform(patch("/api/v1/users/" + teacherUser.getId() + "/deactivate")
+                            .header("Authorization", "Bearer " + adminToken))
+                    .andExpect(status().isOk());
+
+            mockMvc.perform(patch("/api/v1/users/" + teacherUser.getId() + "/activate")
+                            .header("Authorization", "Bearer " + adminToken))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.isActive").value(true));
+        }
+
+        @Test
+        @DisplayName("ADMIN - Should be idempotent (already active user returns 200 OK)")
+        void adminShouldBeIdempotentWhenAlreadyActive() throws Exception {
+            mockMvc.perform(patch("/api/v1/users/" + teacherUser.getId() + "/activate")
+                            .header("Authorization", "Bearer " + adminToken))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.isActive").value(true));
+        }
+
+        @Test
+        @DisplayName("HEAD_TEACHER - Should be forbidden from activating users")
+        void headTeacherShouldBeForbidden() throws Exception {
+            mockMvc.perform(patch("/api/v1/users/" + teacherUser.getId() + "/activate")
                             .header("Authorization", "Bearer " + headTeacherToken))
                     .andExpect(status().isForbidden());
         }

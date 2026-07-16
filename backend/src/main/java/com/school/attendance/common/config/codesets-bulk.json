@@ -1,0 +1,58 @@
+[
+  {
+    "codeSetGroup": "ACADEMIC_YEAR",
+    "code": "2023/2024",
+    "displayName": "2023/2024 Academic Year",
+    "description": "Historical academic year",
+    "attributes": {"startDate": "2023-09-01", "endDate": "2024-06-30"},
+    "sortOrder": 1
+  },
+  {
+    "codeSetGroup": "ACADEMIC_YEAR",
+    "code": "2024/2025",
+    "displayName": "2024/2025 Academic Year",
+    "description": "Previous academic year",
+    "attributes": {"startDate": "2024-09-01", "endDate": "2025-06-30"},
+    "sortOrder": 2
+  },
+  {
+    "codeSetGroup": "ACADEMIC_YEAR",
+    "code": "2025/2026",
+    "displayName": "2025/2026 Academic Year",
+    "description": "Current academic year",
+    "attributes": {"startDate": "2025-09-01", "endDate": "2026-06-30", "isCurrent": true},
+    "sortOrder": 3
+  },
+  {
+    "codeSetGroup": "ACADEMIC_YEAR",
+    "code": "2026/2027",
+    "displayName": "2026/2027 Academic Year",
+    "description": "Upcoming academic year",
+    "attributes": {"startDate": "2026-09-01", "endDate": "2027-06-30"},
+    "sortOrder": 4
+  },
+  {
+    "codeSetGroup": "ACADEMIC_TERM",
+    "code": "T1-2526",
+    "displayName": "Term 1 (2025/2026)",
+    "description": "First term",
+    "attributes": {"startDate": "2025-09-01", "endDate": "2025-12-19", "academicYearCode": "2025/2026"},
+    "sortOrder": 1
+  },
+  {
+    "codeSetGroup": "ACADEMIC_TERM",
+    "code": "T2-2526",
+    "displayName": "Term 2 (2025/2026)",
+    "description": "Second term",
+    "attributes": {"startDate": "2026-01-06", "endDate": "2026-04-03", "academicYearCode": "2025/2026"},
+    "sortOrder": 3
+  },
+  {
+    "codeSetGroup": "ACADEMIC_TERM",
+    "code": "T3-2526",
+    "displayName": "Term 3 (2025/2026)",
+    "description": "Third term",
+    "attributes": {"startDate": "2026-04-20", "endDate": "2026-06-30", "academicYearCode": "2025/2026"},
+    "sortOrder": 5
+  }
+]

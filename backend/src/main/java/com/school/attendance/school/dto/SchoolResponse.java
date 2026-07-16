@@ -1,5 +1,6 @@
 package com.school.attendance.school.dto;
 
+import java.time.Instant;
 import java.util.UUID;
 
 public record SchoolResponse(
@@ -7,9 +8,15 @@ public record SchoolResponse(
         String name,
         String code,
         String address,
-        String academicYear,
-        String currentTerm,
+        UUID academicYearId,
+        String academicYearDisplayName,
+        UUID currentTermId,
+        String currentTermDisplayName,
         String phone,
         String email,
-        String logoUrl
+        String logoUrl,
+        Instant createdAt,
+        UUID createdBy,
+        Instant updatedAt,
+        UUID updatedBy
 ) {}

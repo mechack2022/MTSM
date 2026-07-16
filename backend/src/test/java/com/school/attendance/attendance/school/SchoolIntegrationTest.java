@@ -7,6 +7,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
+import java.util.UUID;
+
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -61,14 +63,14 @@ class SchoolIntegrationTest extends BaseIntegrationTest {
     class UpdateSchoolTests {
 
         @Test
-        @DisplayName("ADMIN - Should update school profile successfully")
+        @DisplayName("ADMIN - Should update school profile successfully with UUID references")
         void adminShouldUpdateSchool() throws Exception {
             SchoolRequest request = new SchoolRequest(
                     "Updated School Name",
                     "UPDATED-CODE",
                     "456 New Avenue",
-                    "2026",
-                    "Term 2",
+                    testAcademicYearId,
+                    testAcademicTermId,
                     "+987654321",
                     "updated@school.edu",
                     "https://example.com/new-logo.png"
@@ -82,20 +84,29 @@ class SchoolIntegrationTest extends BaseIntegrationTest {
                     .andExpect(jsonPath("$.success").value(true))
                     .andExpect(jsonPath("$.data.name").value("Updated School Name"))
                     .andExpect(jsonPath("$.data.code").value("UPDATED-CODE"))
-                    .andExpect(jsonPath("$.data.academicYear").value("2026"))
-                    .andExpect(jsonPath("$.data.currentTerm").value("Term 2"))
+                    .andExpect(jsonPath("$.data.academicYearId").value(testAcademicYearId.toString()))
+                    .andExpect(jsonPath("$.data.academicYearDisplayName").value("2025/2026")) // ✅ New field
+                    .andExpect(jsonPath("$.data.currentTermId").value(testAcademicTermId.toString()))
+                    .andExpect(jsonPath("$.data.currentTermDisplayName").value("Term 1"))     // ✅ New field
                     .andExpect(jsonPath("$.data.phone").value("+987654321"))
                     .andExpect(jsonPath("$.data.email").value("updated@school.edu"))
-                    .andExpect(jsonPath("$.data.logoUrl").value("https://example.com/new-logo.png"));
+                    .andExpect(jsonPath("$.data.logoUrl").value("https://example.com/new-logo.png"))
+                    .andExpect(jsonPath("$.data.createdAt").isNotEmpty()) // ✅ Audit fields
+                    .andExpect(jsonPath("$.data.updatedAt").isNotEmpty());
         }
 
         @Test
-        @DisplayName("ADMIN - Should update only provided fields (others remain)")
+        @DisplayName("ADMIN - Should update only provided fields (others remain null)")
         void adminShouldUpdatePartialFields() throws Exception {
             SchoolRequest request = new SchoolRequest(
                     "Updated School Name",
                     "UPDATED-CODE-2",
-                    null, null, null, null, null, null
+                    null,
+                    null, // academicYearId
+                    null, // currentTermId
+                    null,
+                    null,
+                    null
             );
 
             mockMvc.perform(put("/api/v1/school")
@@ -104,7 +115,7 @@ class SchoolIntegrationTest extends BaseIntegrationTest {
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.name").value("Updated School Name"))
-                    .andExpect(jsonPath("$.data.academicYear").doesNotExist());
+                    .andExpect(jsonPath("$.data.academicYearId").doesNotExist());
         }
 
         @Test
@@ -136,6 +147,23 @@ class SchoolIntegrationTest extends BaseIntegrationTest {
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.error.code").value("VALIDATION_001"));
+        }
+
+        @Test
+        @DisplayName("ADMIN - Should return 404 for invalid academicYearId")
+        void adminShouldGet404ForInvalidAcademicYearId() throws Exception {
+            SchoolRequest request = new SchoolRequest(
+                    "School", "CODE", null,
+                    UUID.randomUUID(),
+                    null, null, null, null
+            );
+
+            mockMvc.perform(put("/api/v1/school")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isNotFound()) // ✅ Changed from isBadRequest() to isNotFound()
+                    .andExpect(jsonPath("$.error.code").value("CODESET_002"));
         }
 
         @Test

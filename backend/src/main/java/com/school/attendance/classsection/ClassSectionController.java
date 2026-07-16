@@ -35,20 +35,6 @@ public class ClassSectionController {
         );
     }
 
-    @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_TEACHER', 'TEACHER')")
-    public ResponseEntity<ApiResponse<List<ClassSectionResponse>>> getAllClasses(
-            @RequestParam(required = false) String academicYear, HttpServletRequest req) {
-
-        List<ClassSectionResponse> classes = (academicYear != null)
-                ? classSectionService.getClassesByAcademicYear(academicYear)
-                : classSectionService.getAllActiveClasses();
-
-        return ResponseEntity.ok(
-                ApiResponse.success(200, messageResolver.getMessage(MessageKey.CLASS_LIST_SUCCESS), classes, req.getRequestURI())
-        );
-    }
-
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_TEACHER', 'TEACHER')")
     public ResponseEntity<ApiResponse<ClassSectionResponse>> getClassSectionById(
@@ -88,6 +74,29 @@ public class ClassSectionController {
                         classSectionService.activateClassSection(id),
                         req.getRequestURI()
                 )
+        );
+    }
+
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_TEACHER', 'TEACHER')")
+    public ResponseEntity<ApiResponse<List<ClassSectionResponse>>> getAllClasses(
+            @RequestParam(required = false) UUID academicYearId,
+            @RequestParam(required = false) UUID gradeLevelId,
+            HttpServletRequest req) {
+
+        List<ClassSectionResponse> classes;
+
+        if (academicYearId != null) {
+            classes = classSectionService.getClassesByAcademicYear(academicYearId);
+        } else if (gradeLevelId != null) {
+            classes = classSectionService.getClassesByGradeLevel(gradeLevelId);
+        } else {
+            classes = classSectionService.getAllActiveClasses();
+        }
+
+        return ResponseEntity.ok(
+                ApiResponse.success(200, messageResolver.getMessage(MessageKey.CLASS_LIST_SUCCESS), classes, req.getRequestURI())
         );
     }
 }

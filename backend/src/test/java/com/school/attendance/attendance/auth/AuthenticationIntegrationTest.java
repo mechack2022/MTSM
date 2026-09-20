@@ -7,12 +7,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class AuthenticationIntegrationTest extends BaseIntegrationTest {
 
     @Test
-    @DisplayName("POST /login - Should authenticate valid admin and return JWT")
+    @DisplayName("POST /login - Should authenticate valid admin and return JWT with Role Code")
     void shouldLoginSuccessfully() throws Exception {
         AuthenticationRequest request = new AuthenticationRequest("admin_test", "password");
 
@@ -42,6 +43,7 @@ class AuthenticationIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Username or password is incorrect"))
                 .andExpect(jsonPath("$.error.code").value("AUTH_001"))
                 .andExpect(jsonPath("$.data").doesNotExist());
     }
@@ -55,7 +57,12 @@ class AuthenticationIntegrationTest extends BaseIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error.code").value("AUTH_001"));
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("AUTH_001"))
+                .andExpect(jsonPath("$.data").doesNotExist());
+        // Note: For security, the response for wrong password and non-existent user
+        // should ideally be identical to prevent user enumeration.
     }
 
     @Test
@@ -67,13 +74,16 @@ class AuthenticationIntegrationTest extends BaseIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value("VALIDATION_001"));
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_001")) // Adjust if your validation code differs
+                .andExpect(jsonPath("$.data").doesNotExist());
     }
 
     @Test
     @DisplayName("POST /login - Should return 401 for deactivated user")
     void shouldRejectDeactivatedUser() throws Exception {
+        // Deactivate the user
         adminUser.setIsActive(false);
         userRepository.save(adminUser);
 
@@ -83,6 +93,9 @@ class AuthenticationIntegrationTest extends BaseIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error.code").value("AUTH_001"));
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("AUTH_001")) // Adjust if your code is AUTH_ACCOUNT_DEACTIVATED
+                .andExpect(jsonPath("$.data").doesNotExist());
     }
 }

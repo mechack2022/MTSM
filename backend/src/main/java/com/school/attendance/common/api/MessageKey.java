@@ -29,7 +29,7 @@ public enum MessageKey {
     AUTH_BAD_CREDENTIALS(HttpStatus.UNAUTHORIZED, "auth.error.bad_credentials", "AUTH_001"),
     AUTH_USER_NOT_FOUND(HttpStatus.NOT_FOUND, "auth.error.user_not_found", "AUTH_002"),
     AUTH_UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "auth.error.unauthorized", "AUTH_003"),
-
+    AUTH_INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "Invalid username or password", "AUTH_004"),
     // User Management (Success)
     USER_CREATE_SUCCESS(HttpStatus.CREATED, "user.create.success", null),
     USER_LIST_SUCCESS(HttpStatus.OK, "user.list.success", null),

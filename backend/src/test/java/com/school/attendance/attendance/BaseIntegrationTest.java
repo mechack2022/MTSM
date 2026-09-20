@@ -1,22 +1,20 @@
 package com.school.attendance.attendance;
 
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.school.attendance.auth.AuthenticationRequest;
 import com.school.attendance.auth.AuthenticationResponse;
-import com.school.attendance.classsection.ClassSectionRepository;
-import com.school.attendance.classsection.entity.ClassSection;
 import com.school.attendance.common.api.ApiResponse;
 import com.school.attendance.common.entity.CodeSet;
 import com.school.attendance.common.enums.CodeSetGroup;
 import com.school.attendance.common.repository.CodeSetRepository;
-import com.school.attendance.enrollment.EnrollmentRepository;
-import com.school.attendance.learner.entity.Learner;
-import com.school.attendance.learner.repository.LearnerRepository;
+import com.school.attendance.rbac.entity.Role;
+import com.school.attendance.rbac.enums.AccessScope;
+import com.school.attendance.rbac.repository.RoleRepository;
 import com.school.attendance.school.SchoolRepository;
 import com.school.attendance.school.entity.School;
+import com.school.attendance.tenant.entity.Tenant;
+import com.school.attendance.tenant.repository.TenantRepository;
 import com.school.attendance.user.entity.AppUser;
-import com.school.attendance.user.enums.UserRole;
 import com.school.attendance.user.repository.AppUserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,7 +31,6 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import java.time.LocalDate;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -60,6 +57,9 @@ public abstract class BaseIntegrationTest {
         registry.add("spring.security.jwt.secret-key", () -> "test-secret-key-that-is-long-enough-for-hmac-sha-256-algorithm-123456");
         registry.add("spring.security.jwt.expiration-time", () -> "3600000");
         registry.add("app.seed.enabled", () -> "false");
+
+        registry.add("SEED_ADMIN_PASSWORD", () -> "TestPassword123!");
+        registry.add("SEED_TENANT_ADMIN_PASSWORD", () -> "TestPassword123!");
     }
 
     @Autowired protected MockMvc mockMvc;
@@ -68,41 +68,52 @@ public abstract class BaseIntegrationTest {
     @Autowired protected SchoolRepository schoolRepository;
     @Autowired protected PasswordEncoder passwordEncoder;
     @Autowired protected CodeSetRepository codeSetRepository;
-    @Autowired protected ClassSectionRepository classSectionRepository;
-    @Autowired protected LearnerRepository learnerRepository;
-    @Autowired protected EnrollmentRepository enrollmentRepository;
+    @Autowired protected TenantRepository tenantRepository;
+    @Autowired protected RoleRepository roleRepository;
 
-
+    protected Tenant testTenant;
     protected School testSchool;
+    protected Role adminRole;
     protected AppUser adminUser;
-    protected AppUser headTeacherUser;
-    protected AppUser teacherUser;
     protected String adminToken;
-    protected String headTeacherToken;
-    protected String teacherToken;
 
     protected UUID testAcademicYearId;
     protected UUID testGradeLevelId;
     protected UUID testAcademicTermId;
-    protected Learner testLearner;
 
     @BeforeEach
     void setUpBase() throws Exception {
-        enrollmentRepository.deleteAll();
-        learnerRepository.deleteAll();
-        classSectionRepository.deleteAll();
         userRepository.deleteAll();
         codeSetRepository.deleteAll();
         schoolRepository.deleteAll();
+        roleRepository.deleteAll();
+        tenantRepository.deleteAll();
+
+        // 1. Create Tenant
+        testTenant = tenantRepository.save(Tenant.builder()
+                .name("Test Tenant")
+                .code("TEST01")
+                .contactEmail("test@test.com")
+                .isActive(true)
+                .build());
 
         testSchool = schoolRepository.save(School.builder()
+                .tenantId(testTenant.getId())
                 .name("Test School")
                 .code("TEST-SCHOOL")
                 .address("Test Address")
                 .build());
 
+        adminRole = roleRepository.save(Role.builder()
+                .code("ADMIN")
+                .displayName("Administrator")
+                .accessScope(AccessScope.TENANT)
+                .isSystemRole(true)
+                .build());
+
+        // 4. Create Code Sets (✅ NOW REQUIRES tenantId, NOT schoolId)
         CodeSet academicYear = codeSetRepository.save(CodeSet.builder()
-                .schoolId(testSchool.getId())
+                .tenantId(testTenant.getId())
                 .codeSetGroup(CodeSetGroup.ACADEMIC_YEAR)
                 .code("2026")
                 .displayName("2025/2026")
@@ -112,7 +123,7 @@ public abstract class BaseIntegrationTest {
         testAcademicYearId = academicYear.getId();
 
         CodeSet gradeLevel = codeSetRepository.save(CodeSet.builder()
-                .schoolId(testSchool.getId())
+                .tenantId(testTenant.getId())
                 .codeSetGroup(CodeSetGroup.GRADE_LEVEL)
                 .code("G1")
                 .displayName("Grade 1")
@@ -122,7 +133,7 @@ public abstract class BaseIntegrationTest {
         testGradeLevelId = gradeLevel.getId();
 
         CodeSet academicTerm = codeSetRepository.save(CodeSet.builder()
-                .schoolId(testSchool.getId())
+                .tenantId(testTenant.getId())
                 .codeSetGroup(CodeSetGroup.ACADEMIC_TERM)
                 .code("T1")
                 .displayName("Term 1")
@@ -131,34 +142,17 @@ public abstract class BaseIntegrationTest {
                 .build());
         testAcademicTermId = academicTerm.getId();
 
-        adminUser = createTestUser("admin_test", "password", UserRole.ADMIN);
-        headTeacherUser = createTestUser("head_test", "password", UserRole.HEAD_TEACHER);
-        teacherUser = createTestUser("teacher_test", "password", UserRole.TEACHER);
-
+        adminUser = createTestUser("admin_test", "password", adminRole.getId(), testTenant.getId());
         adminToken = loginAndGetToken("admin_test", "password");
-        headTeacherToken = loginAndGetToken("head_test", "password");
-        teacherToken = loginAndGetToken("teacher_test", "password");
-
-        //  Create a test learner for enrollment tests
-        testLearner = learnerRepository.save(Learner.builder()
-                .schoolId(testSchool.getId())
-                .firstName("Existing")
-                .lastName("Learner")
-                .studentNumber("EXISTING-001")
-                .gradeLevelId(testGradeLevelId)
-                .dateOfBirth(LocalDate.of(2015, 5, 15))
-                .sex("Male")
-                .isActive(true)
-                .build());
     }
 
-    protected AppUser createTestUser(String username, String rawPassword, UserRole role) {
+    protected AppUser createTestUser(String username, String rawPassword, UUID roleId, UUID tenantId) {
         return userRepository.save(AppUser.builder()
-                .schoolId(testSchool.getId())
+                .tenantId(tenantId)
+                .roleId(roleId)
                 .username(username)
                 .passwordHash(passwordEncoder.encode(rawPassword))
-                .fullName("Test " + role.name())
-                .role(role)
+                .fullName("Test Admin")
                 .isActive(true)
                 .build());
     }
@@ -178,17 +172,5 @@ public abstract class BaseIntegrationTest {
         ApiResponse<AuthenticationResponse> response = objectMapper.readValue(json, responseType);
 
         return response.data().token();
-    }
-
-    protected ClassSection createTestClassSection(String name, UUID academicYearId) {
-        return classSectionRepository.save(ClassSection.builder()
-                .schoolId(testSchool.getId())
-                .name(name)
-                .gradeLevelId(testGradeLevelId)
-                .academicYearId(academicYearId)
-                .classTeacherId(teacherUser.getId())
-                .capacity(30)
-                .isActive(true)
-                .build());
     }
 }

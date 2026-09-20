@@ -12,6 +12,7 @@ import com.school.attendance.user.repository.AppUserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -32,18 +33,21 @@ public class AuthenticationService {
             authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.username(), request.password())
             );
-        } catch (BadCredentialsException e) {
-            throw new BusinessException(MessageKey.AUTH_USER_NOT_FOUND);
+        } catch (BadCredentialsException | DisabledException e) {
+            // ✅ FIX 2: Catch BOTH wrong password and deactivated user.
+            // Throw a generic 401 error to prevent user enumeration.
+            // Make sure MessageKey.AUTH_INVALID_CREDENTIALS maps to HTTP 401 in your ExceptionHandler.
+            throw new BusinessException(MessageKey.AUTH_BAD_CREDENTIALS);
         }
 
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
         String token = jwtService.generateOnlineToken(userDetails);
 
-        // Resolve a display role for the response
+        // ✅ FIX 1: Fetch the actual Role entity to get the String code (e.g., "ADMIN")
         String roleDisplay = userDetails.isPlatformAdmin()
                 ? "PLATFORM_ADMIN"
-                : userRepository.findById(userDetails.getUserId())
-                .map(u -> u.getRoleId().toString())
+                : roleRepository.findById(userDetails.getRoleId())
+                .map(Role::getCode)
                 .orElse("UNKNOWN");
 
         return new AuthenticationResponse(

@@ -9,5 +9,6 @@ public enum CodeSetGroup {
     GENDER,
     RELIGION,
     NATIONALITY,
-    BLOOD_GROUP
+    BLOOD_GROUP,
+    STUDENT_NUMBER_PATTERN
 }

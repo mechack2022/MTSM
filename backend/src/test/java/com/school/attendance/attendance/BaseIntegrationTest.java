@@ -4,10 +4,15 @@ package com.school.attendance.attendance;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.school.attendance.auth.AuthenticationRequest;
 import com.school.attendance.auth.AuthenticationResponse;
+import com.school.attendance.classsection.ClassSectionRepository;
+import com.school.attendance.classsection.entity.ClassSection;
 import com.school.attendance.common.api.ApiResponse;
 import com.school.attendance.common.entity.CodeSet;
 import com.school.attendance.common.enums.CodeSetGroup;
 import com.school.attendance.common.repository.CodeSetRepository;
+import com.school.attendance.enrollment.EnrollmentRepository;
+import com.school.attendance.learner.entity.Learner;
+import com.school.attendance.learner.repository.LearnerRepository;
 import com.school.attendance.school.SchoolRepository;
 import com.school.attendance.school.entity.School;
 import com.school.attendance.user.entity.AppUser;
@@ -28,11 +33,11 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import org.testcontainers.junit.jupiter.Container;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
@@ -40,9 +45,6 @@ import org.testcontainers.junit.jupiter.Container;
 @Testcontainers
 public abstract class BaseIntegrationTest {
 
-
-
-//    @Container
     @ServiceConnection
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16")
             .withDatabaseName("test_db")
@@ -66,6 +68,10 @@ public abstract class BaseIntegrationTest {
     @Autowired protected SchoolRepository schoolRepository;
     @Autowired protected PasswordEncoder passwordEncoder;
     @Autowired protected CodeSetRepository codeSetRepository;
+    @Autowired protected ClassSectionRepository classSectionRepository;
+    @Autowired protected LearnerRepository learnerRepository;
+    @Autowired protected EnrollmentRepository enrollmentRepository;
+
 
     protected School testSchool;
     protected AppUser adminUser;
@@ -78,12 +84,16 @@ public abstract class BaseIntegrationTest {
     protected UUID testAcademicYearId;
     protected UUID testGradeLevelId;
     protected UUID testAcademicTermId;
+    protected Learner testLearner;
 
     @BeforeEach
     void setUpBase() throws Exception {
+        enrollmentRepository.deleteAll();
+        learnerRepository.deleteAll();
+        classSectionRepository.deleteAll();
         userRepository.deleteAll();
-        schoolRepository.deleteAll();
         codeSetRepository.deleteAll();
+        schoolRepository.deleteAll();
 
         testSchool = schoolRepository.save(School.builder()
                 .name("Test School")
@@ -128,6 +138,18 @@ public abstract class BaseIntegrationTest {
         adminToken = loginAndGetToken("admin_test", "password");
         headTeacherToken = loginAndGetToken("head_test", "password");
         teacherToken = loginAndGetToken("teacher_test", "password");
+
+        //  Create a test learner for enrollment tests
+        testLearner = learnerRepository.save(Learner.builder()
+                .schoolId(testSchool.getId())
+                .firstName("Existing")
+                .lastName("Learner")
+                .studentNumber("EXISTING-001")
+                .gradeLevelId(testGradeLevelId)
+                .dateOfBirth(LocalDate.of(2015, 5, 15))
+                .sex("Male")
+                .isActive(true)
+                .build());
     }
 
     protected AppUser createTestUser(String username, String rawPassword, UserRole role) {
@@ -156,5 +178,17 @@ public abstract class BaseIntegrationTest {
         ApiResponse<AuthenticationResponse> response = objectMapper.readValue(json, responseType);
 
         return response.data().token();
+    }
+
+    protected ClassSection createTestClassSection(String name, UUID academicYearId) {
+        return classSectionRepository.save(ClassSection.builder()
+                .schoolId(testSchool.getId())
+                .name(name)
+                .gradeLevelId(testGradeLevelId)
+                .academicYearId(academicYearId)
+                .classTeacherId(teacherUser.getId())
+                .capacity(30)
+                .isActive(true)
+                .build());
     }
 }

@@ -1,26 +1,21 @@
 package com.school.attendance.common.util;
 
 import com.school.attendance.user.entity.AppUser;
-import com.school.attendance.user.enums.UserRole;
-
+import java.util.UUID;
 import java.util.function.Predicate;
 
-public final class UserPredicates {
+public class UserPredicates {
 
-    private UserPredicates() {}
+    public static Predicate<AppUser> hasRoleId(UUID roleId) {
+        return user -> user.getRoleId() != null && user.getRoleId().equals(roleId);
+    }
 
-    // A functional rule: Is the user active?
     public static Predicate<AppUser> isActive() {
-        return AppUser::getIsActive;
+        return user -> Boolean.TRUE.equals(user.getIsActive());
     }
 
-    // A functional rule: Does the user have a specific role?
-    public static Predicate<AppUser> hasRole(UserRole role) {
-        return user -> user.getRole() == role;
+    public static Predicate<AppUser> belongsToTenant(UUID tenantId) {
+        return user -> tenantId != null && tenantId.equals(user.getTenantId());
     }
 
-    // Composing rules: Is the user an active Admin?
-    public static Predicate<AppUser> isActiveAdmin() {
-        return isActive().and(hasRole(UserRole.ADMIN));
-    }
 }

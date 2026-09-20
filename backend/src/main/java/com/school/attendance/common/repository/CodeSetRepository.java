@@ -11,19 +11,11 @@ import java.util.UUID;
 
 @Repository
 public interface CodeSetRepository extends JpaRepository<CodeSet, UUID> {
-    List<CodeSet> findBySchoolIdAndCodeSetGroupAndIsActiveTrueOrderBySortOrderAsc(
-            UUID schoolId, CodeSetGroup codeSetGroup);
+    boolean existsByTenantIdAndCodeSetGroupAndCode(UUID tenantId, CodeSetGroup group, String code);
 
-    List<CodeSet> findBySchoolIdAndCodeSetGroupOrderBySortOrderAsc(
-            UUID schoolId, CodeSetGroup codeSetGroup);
+    List<CodeSet> findByTenantIdAndCodeSetGroupAndIsActiveTrueOrderBySortOrderAsc(
+            UUID tenantId, CodeSetGroup group);
 
-    Optional<CodeSet> findBySchoolIdAndCodeSetGroupAndCode(
-            UUID schoolId, CodeSetGroup codeSetGroup, String code);
-
-    boolean existsBySchoolIdAndCodeSetGroupAndCode(
-            UUID schoolId, CodeSetGroup codeSetGroup, String code);
-
-    boolean existsBySchoolIdAndId(UUID schoolId, UUID id);
-
-    long countBySchoolIdAndCodeSetGroup(UUID schoolId, CodeSetGroup codeSetGroup);
+    List<CodeSet> findByTenantIdAndCodeSetGroupOrderBySortOrderAsc(
+            UUID tenantId, CodeSetGroup group);
 }

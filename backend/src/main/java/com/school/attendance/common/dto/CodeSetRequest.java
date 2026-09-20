@@ -8,8 +8,10 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 import java.util.Map;
+import java.util.UUID;
 
 public record CodeSetRequest(
+        UUID targetTenantId,
         @NotNull(message = "Code set group is required")
         CodeSetGroup codeSetGroup,
 

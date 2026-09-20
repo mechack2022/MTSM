@@ -1,17 +1,16 @@
 package com.school.attendance.user.dto;
 
 
-import com.school.attendance.user.enums.UserRole;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
+import java.util.List;
+import java.util.UUID;
 
 public record UpdateUserRequest(
-        @NotBlank(message = "Full name is required")
+        @Size(max = 255)
         String fullName,
-
-        @NotNull(message = "Role is required")
-        UserRole role,
-
-        String newPassword,
-        String username
+        UUID roleId,
+        List<UUID> schoolIds,
+        @Size(min = 6)
+        String newPassword
 ) {}

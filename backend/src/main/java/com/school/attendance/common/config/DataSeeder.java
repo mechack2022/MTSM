@@ -1,32 +1,47 @@
 package com.school.attendance.common.config;
 
+import com.school.attendance.rbac.entity.Role;
+import com.school.attendance.rbac.repository.RoleRepository;
 import com.school.attendance.school.SchoolRepository;
 import com.school.attendance.school.entity.School;
+import com.school.attendance.tenant.entity.Tenant;
+import com.school.attendance.tenant.repository.TenantRepository;
 import com.school.attendance.user.entity.AppUser;
-import com.school.attendance.user.enums.UserRole;
+import com.school.attendance.user.entity.AppUserSchool;
+import com.school.attendance.user.entity.PlatformAdmin;
 import com.school.attendance.user.repository.AppUserRepository;
+import com.school.attendance.user.repository.AppUserSchoolRepository;
+import com.school.attendance.user.repository.PlatformAdminRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+
+import java.util.UUID;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@Profile({"dev"})
+@Profile({"dev", "test"})
+@Order(10)
 public class DataSeeder implements CommandLineRunner {
 
     private final AppUserRepository userRepository;
+    private final AppUserSchoolRepository appUserSchoolRepository;
     private final SchoolRepository schoolRepository;
+    private final TenantRepository tenantRepository;
+    private final RoleRepository roleRepository;
+    private final PlatformAdminRepository platformAdminRepository; // ✅ NEW
     private final PasswordEncoder passwordEncoder;
 
-    @org.springframework.beans.factory.annotation.Value("${app.seed.enabled}")
+    @Value("${app.seed.enabled:false}")
     private boolean isSeedingEnabled;
 
-    @Value("${app.seed.admin-password}")
+    @Value("${app.seed.admin-password:Admin@123}")
     private String defaultAdminPassword;
 
     @Override
@@ -36,62 +51,106 @@ public class DataSeeder implements CommandLineRunner {
             return;
         }
 
-        log.info("🌱 Starting database seeding...");
-        seedDefaultSchool();
-        seedAdminUser();
+        log.info("🌱 Starting multi-tenant database seeding...");
+
+        // 1. Seed the platform admin (SUPER_ADMIN — above all tenants)
+        seedPlatformAdmin();
+
+        // 2. Seed a tenant + school + tenant admin for testing
+        Tenant tenant = seedDefaultTenant();
+        School school = seedDefaultSchool(tenant.getId());
+        seedTenantAdmin(tenant.getId(), school.getId());
+
         log.info("✅ Database seeding completed successfully.");
     }
 
-    private void seedDefaultSchool() {
-        String schoolCode = "PILOT-SCHOOL-01";
+    // ─── Platform Admin (above all tenants) ────────────────────────
+    private void seedPlatformAdmin() {
+        String username = "superadmin";
+        if (platformAdminRepository.existsByUsername(username)) {
+            log.info("ℹ️ Platform admin '{}' already exists, skipping.", username);
+            return;
+        }
 
-        if (!schoolRepository.existsByCode(schoolCode)) {
-            School school = School.builder()
+        PlatformAdmin admin = PlatformAdmin.builder()
+                .username(username)
+                .passwordHash(passwordEncoder.encode(defaultAdminPassword))
+                .fullName("Platform Super Administrator")
+                .isActive(true)
+                .build();
+
+        platformAdminRepository.save(admin);
+        log.info("🔐 PLATFORM ADMIN SEEDED");
+        log.info("   👤 Username: {}", username);
+        log.info("   🔑 Password: {}", defaultAdminPassword);
+        log.info("   🌐 Scope: SYSTEM (above all tenants)");
+    }
+
+    // ─── Tenant + School ───────────────────────────────────────────
+    private Tenant seedDefaultTenant() {
+        String tenantCode = "PILOT1";
+        return tenantRepository.findByCode(tenantCode).orElseGet(() -> {
+            Tenant t = Tenant.builder()
+                    .name("Pilot Education Organization")
+                    .code(tenantCode)
+                    .contactEmail("admin@pilot-edu.org")
+                    .isActive(true)
+                    .build();
+            Tenant saved = tenantRepository.save(t);
+            log.info("✅ Seeded tenant: {}", tenantCode);
+            return saved;
+        });
+    }
+
+    private School seedDefaultSchool(UUID tenantId) {
+        String schoolCode = "PILOT";
+        return schoolRepository.findByCode(schoolCode).orElseGet(() -> {
+            School s = School.builder()
+                    .tenantId(tenantId)
                     .name("Pilot High School")
                     .code(schoolCode)
                     .address("123 Education Lane, Pilot City")
                     .build();
-
-            schoolRepository.save(school);
-            log.info("✅ Seeded default school: {}", schoolCode);
-        } else {
-            log.info("ℹ️ School already exists, skipping seed.");
-        }
+            School saved = schoolRepository.save(s);
+            log.info("✅ Seeded school: {} under tenant", schoolCode);
+            return saved;
+        });
     }
 
-    private void seedAdminUser() {
-        String adminUsername = "admin";
-        userRepository.findByUsername(adminUsername)
-                .ifPresent(u -> log.info("ℹ️ Admin user already exists, skipping seed."));
-
-        userRepository.findByUsername(adminUsername)
-                .ifPresentOrElse(
-                        // 1. Consumer: What to do if the user ALREADY exists
-                        user -> log.info("ℹ️ Admin user '{}' already exists, skipping seed.", user.getUsername()),
-                        // 2. Runnable: What to do if the user is EMPTY (doesn't exist)
-                        () -> {
-                            School school = schoolRepository.findFirstByOrderByIdAsc()
-                                    .orElseThrow(() -> new RuntimeException("No school found to assign to Admin."));
-                            AppUser admin = AppUser.builder()
-                                    .username(adminUsername)
-                                    .passwordHash(passwordEncoder.encode(defaultAdminPassword))
-                                    .fullName("System Administrator")
-                                    .role(UserRole.ADMIN)
-                                    .schoolId(school.getId())
-                                    .isActive(true)
-                                    .build();
-
-                            userRepository.save(admin);
-                            logAdminCredentials(adminUsername);
-                        });
+    // ─── Tenant Admin (a regular app_user with TENANT_ADMIN role) ───
+    private void seedTenantAdmin(UUID tenantId, UUID schoolId) {
+        String username = "admin";
+        if (userRepository.existsByUsername(username)) {
+            log.info("ℹ️ Tenant admin '{}' already exists, skipping.", username);
+            return;
         }
 
-    // Helper method to keep the lambda clean
-    private void logAdminCredentials(String username) {
-        log.info("==================================================");
-        log.info("🔐 ADMIN USER SEEDED SUCCESSFULLY");
-        log.info("👤 Username: {}", username);
-        log.info(" Login URL: http://localhost:8080/api/v1/auth/login");
-        log.info("==================================================");
+        Role tenantAdminRole = roleRepository.findByCode("TENANT_ADMIN")
+                .orElseThrow(() -> new RuntimeException("TENANT_ADMIN role not found."));
+
+        AppUser admin = AppUser.builder()
+                .tenantId(tenantId)
+                .username(username)
+                .passwordHash(passwordEncoder.encode(defaultAdminPassword))
+                .fullName("Tenant Administrator")
+                .roleId(tenantAdminRole.getId())
+                .isActive(true)
+                .build();
+
+        AppUser saved = userRepository.save(admin);
+
+        // Assign to the school via join table (tenant admins typically see all schools
+        // in their tenant, but we seed one explicit assignment for testing)
+        AppUserSchool assignment = AppUserSchool.builder()
+                .appUserId(saved.getId())
+                .schoolId(schoolId)
+                .assignedBy(saved.getId())
+                .build();
+        appUserSchoolRepository.save(assignment);
+
+        log.info("🔐 TENANT ADMIN SEEDED");
+        log.info("   👤 Username: {}", username);
+        log.info("   🔑 Password: {}", defaultAdminPassword);
+        log.info("   🏢 Tenant: {}", tenantId);
     }
 }

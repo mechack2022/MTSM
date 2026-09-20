@@ -14,16 +14,26 @@ import java.util.UUID;
 public class AuditorAwareConfig {
 
     @Bean
-    public AuditorAware<UUID> auditorAware() {
+    public AuditorAware<UUID> auditorProvider() {
         return () -> {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-            if (authentication == null || !authentication.isAuthenticated()
-                    || authentication.getPrincipal() instanceof String) {
+            if (authentication == null || !authentication.isAuthenticated()) {
                 return Optional.empty();
             }
-            if (authentication.getPrincipal() instanceof CustomUserDetails customUserDetails) {
-                return Optional.of(customUserDetails.getId());
+
+            Object principal = authentication.getPrincipal();
+
+            if (principal instanceof String && "anonymousUser".equals(principal)) {
+                return Optional.empty();
+            }
+
+            if (principal instanceof CustomUserDetails userDetails) {
+                if (userDetails.isPlatformAdmin()) {
+                    return Optional.empty();
+                }
+
+                return Optional.ofNullable(userDetails.getUserId());
             }
 
             return Optional.empty();

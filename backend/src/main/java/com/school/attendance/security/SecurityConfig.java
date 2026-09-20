@@ -1,5 +1,11 @@
 package com.school.attendance.security;
 
+import com.school.attendance.user.PlatformAdminDetailsService;
+import com.school.attendance.user.repository.AppUserRepository;
+import com.school.attendance.rbac.repository.PermissionRepository;
+import com.school.attendance.rbac.repository.RolePermissionRepository;
+import com.school.attendance.user.repository.AppUserSchoolRepository;
+import com.school.attendance.user.repository.PlatformAdminRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,9 +18,10 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -24,16 +31,57 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthFilter;
-    private final UserDetailsService userDetailsService;
-    private final RestAuthenticationEntryPoint authenticationEntryPoint;
+    // ✅ Inject repositories needed to build the UserDetailsService beans
+    private final AppUserRepository appUserRepository;
+    private final AppUserSchoolRepository appUserSchoolRepository;
+    private final RolePermissionRepository rolePermissionRepository;
+    private final PermissionRepository permissionRepository;
+    private final PlatformAdminRepository platformAdminRepository;
 
+    private final JwtService jwtService;
+    private final RestAuthenticationEntryPoint authenticationEntryPoint;
+    private final RestAccessDeniedHandler accessDeniedHandler;
+
+    // ✅ 1. Build CustomUserDetailsService as a Bean
+    @Bean
+    public CustomUserDetailsService customUserDetailsService() {
+        return new CustomUserDetailsService(
+                appUserRepository,
+                appUserSchoolRepository,
+                rolePermissionRepository,
+                permissionRepository
+        );
+    }
+
+    // ✅ 2. Build PlatformAdminDetailsService as a Bean
+    @Bean
+    public PlatformAdminDetailsService platformAdminDetailsService() {
+        return new PlatformAdminDetailsService(platformAdminRepository, permissionRepository);
+    }
+
+    // ✅ 3. Composite UserDetailsService — tries app_user first, then platform_admin
+    @Bean
+    public UserDetailsService userDetailsService() {
+        return username -> {
+            try {
+                return customUserDetailsService().loadUserByUsername(username);
+            } catch (UsernameNotFoundException e) {
+                return platformAdminDetailsService().loadUserByUsername(username);
+            }
+        };
+    }
+
+    // ✅ 4. JWT Filter
+    @Bean
+    public JwtAuthenticationFilter jwtAuthenticationFilter() {
+        return new JwtAuthenticationFilter(jwtService, userDetailsService());
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(AbstractHttpConfigurer::disable) // Stateless API
-                .cors(AbstractHttpConfigurer::disable) // Handled via WebMvcConfigurer or CORS filter if needed
+                .csrf(AbstractHttpConfigurer::disable)
+                .cors(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/v1/auth/**",
@@ -45,10 +93,13 @@ public class SecurityConfig {
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
-                .exceptionHandling(ex -> ex.authenticationEntryPoint(authenticationEntryPoint))
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler)
+                )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -56,7 +107,7 @@ public class SecurityConfig {
     @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        authProvider.setUserDetailsService(userDetailsService);
+        authProvider.setUserDetailsService(userDetailsService());
         authProvider.setPasswordEncoder(passwordEncoder());
         return authProvider;
     }

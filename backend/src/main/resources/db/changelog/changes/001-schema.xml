@@ -1,0 +1,959 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+    <!-- ===================================================================== -->
+    <!-- 001: Complete Multi-Tenant Schema (Current State)                     -->
+    <!-- School Attendance & Learner Management System                         -->
+    <!--                                                                       -->
+    <!-- Key changes applied in this revision:                                 -->
+    <!--   - app_user no longer has school_id or the school/tenant XOR check.  -->
+    <!--     Every app_user belongs to exactly one tenant_id (NOT NULL).       -->
+    <!--   - NEW: app_user_school join table — explicit, unbounded            -->
+    <!--     user-to-school assignment (one, several, or all schools in a     -->
+    <!--     tenant), replacing the old single-school inference.              -->
+    <!--   - NEW: role.access_scope — SYSTEM | TENANT | ASSIGNED_SCHOOLS | OWN -->
+    <!--     Determines HOW a permission's resource ownership is resolved.    -->
+    <!--   - NEW: role gets a CHECK ensuring school_id and tenant_id are      -->
+    <!--     never both set (seeded system role = both null; custom role =    -->
+    <!--     scoped to exactly one of school or tenant).                      -->
+    <!--   - NEW: permission.resource_scope — SYSTEM | TENANT | SCHOOL        -->
+    <!--     Determines WHAT KIND of resource the permission protects.        -->
+    <!--   - NEW: platform_admin — a separate table for true SYSTEM-scope      -->
+    <!--     platform operators, kept out of app_user entirely so             -->
+    <!--     app_user.tenant_id can remain a hard NOT NULL guarantee.         -->
+    <!--   - RLS policies reworked to resolve school access via               -->
+    <!--     app_user_school membership (covers ASSIGNED_SCHOOLS) combined    -->
+    <!--     with tenant-wide access (covers TENANT scope), plus a            -->
+    <!--     system-admin bypass flag for platform_admin sessions.           -->
+    <!--   - ✅ CHANGED: code_set is now TENANT-scoped (tenant_id instead     -->
+    <!--     of school_id). A tenant creates code sets once and all schools   -->
+    <!--     under that tenant share them.                                    -->
+    <!--   - Prior renames retained: student_number -> learner_number,        -->
+    <!--     student_id_sequence -> learner_id_sequence.                      -->
+    <!-- ===================================================================== -->
+    <!-- ===================================================================== -->
+    <!-- PHASE 1: CREATE ALL TABLES                                            -->
+    <!-- ===================================================================== -->
+    <!-- 1. Tenant -->
+    <changeSet id="001-01-create-tenant" author="system">
+        <comment>Organization that owns one or more schools</comment>
+        <createTable tableName="tenant">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="varchar(255)"><constraints nullable="false"/></column>
+            <column name="code" type="varchar(50)"><constraints nullable="false"/></column>
+            <column name="contact_email" type="varchar(255)"/>
+            <column name="contact_phone" type="varchar(50)"/>
+            <column name="is_active" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by" type="uuid"/>
+            <column name="updated_by" type="uuid"/>
+        </createTable>
+    </changeSet>
+    <!-- 2. School -->
+    <changeSet id="001-02-create-school" author="system">
+        <comment>School belonging to exactly one tenant</comment>
+        <createTable tableName="school">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="tenant_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="name" type="varchar(255)"><constraints nullable="false"/></column>
+            <column name="code" type="varchar(50)"><constraints nullable="false"/></column>
+            <column name="address" type="varchar(500)"/>
+            <column name="academic_year_id" type="uuid"/>
+            <column name="current_term_id" type="uuid"/>
+            <column name="phone" type="varchar(50)"/>
+            <column name="email" type="varchar(255)"/>
+            <column name="logo_url" type="varchar(500)"/>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by" type="uuid"/>
+            <column name="updated_by" type="uuid"/>
+        </createTable>
+    </changeSet>
+    <!-- 3. Code set — ✅ CHANGED: now tenant-scoped instead of school-scoped -->
+    <changeSet id="001-03-create-code-set" author="system">
+        <comment>Unified lookup table for tenant-level configuration values (academic years, terms, etc.).
+            Shared by all schools under the owning tenant.</comment>
+        <createTable tableName="code_set">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="tenant_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="code_set_group" type="varchar(50)"><constraints nullable="false"/></column>
+            <column name="code" type="varchar(50)"><constraints nullable="false"/></column>
+            <column name="display_name" type="varchar(100)"><constraints nullable="false"/></column>
+            <column name="description" type="varchar(500)"/>
+            <column name="attributes" type="jsonb"/>
+            <column name="sort_order" type="integer"><constraints nullable="false"/></column>
+            <column name="is_active" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by" type="uuid"/>
+            <column name="updated_by" type="uuid"/>
+        </createTable>
+    </changeSet>
+    <!-- 4. Role -->
+    <changeSet id="001-04-create-role" author="system">
+        <comment>Seeded system roles (school_id and tenant_id both null) or custom
+            roles scoped to exactly one school or one tenant.</comment>
+        <createTable tableName="role">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="school_id" type="uuid"/>
+            <column name="tenant_id" type="uuid"/>
+            <column name="code" type="varchar(50)"><constraints nullable="false"/></column>
+            <column name="display_name" type="varchar(100)"><constraints nullable="false"/></column>
+            <column name="description" type="varchar(500)"/>
+            <column name="access_scope" type="varchar(20)"><constraints nullable="false"/></column>
+            <column name="is_system_role" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by" type="uuid"/>
+            <column name="updated_by" type="uuid"/>
+        </createTable>
+        <sql>
+            ALTER TABLE role ADD CONSTRAINT ck_role_scope CHECK (
+                NOT (school_id IS NOT NULL AND tenant_id IS NOT NULL)
+                );
+            ALTER TABLE role ADD CONSTRAINT ck_role_access_scope CHECK (
+                access_scope IN ('SYSTEM', 'TENANT', 'ASSIGNED_SCHOOLS', 'OWN')
+                );
+        </sql>
+    </changeSet>
+    <!-- 5. Permission -->
+    <changeSet id="001-05-create-permission" author="system">
+        <comment>Seeded permission catalog — developer-controlled, never created by users.</comment>
+        <createTable tableName="permission">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="code" type="varchar(100)"><constraints nullable="false"/></column>
+            <column name="display_name" type="varchar(150)"><constraints nullable="false"/></column>
+            <column name="description" type="varchar(500)"/>
+            <column name="category" type="varchar(50)"/>
+            <column name="resource_scope" type="varchar(20)"><constraints nullable="false"/></column>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <sql>
+            ALTER TABLE permission ADD CONSTRAINT ck_permission_resource_scope CHECK (
+                resource_scope IN ('SYSTEM', 'TENANT', 'SCHOOL')
+                );
+        </sql>
+    </changeSet>
+    <!-- 6. App user -->
+    <changeSet id="001-06-create-app-user" author="system">
+        <comment>Tenant-facing product user. Always belongs to exactly one tenant.</comment>
+        <createTable tableName="app_user">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="tenant_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="username" type="varchar(100)"><constraints nullable="false"/></column>
+            <column name="password_hash" type="varchar(255)"><constraints nullable="false"/></column>
+            <column name="full_name" type="varchar(255)"><constraints nullable="false"/></column>
+            <column name="role_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="is_active" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by" type="uuid"/>
+            <column name="updated_by" type="uuid"/>
+        </createTable>
+    </changeSet>
+    <!-- 6b. App user school -->
+    <changeSet id="001-06b-create-app-user-school" author="system">
+        <comment>Explicit assignment of a tenant-facing user to a school.</comment>
+        <createTable tableName="app_user_school">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="app_user_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="school_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="assigned_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="assigned_by" type="uuid"/>
+        </createTable>
+    </changeSet>
+    <!-- 6c. Platform admin -->
+    <changeSet id="001-06c-create-platform-admin" author="system">
+        <comment>Platform-level operator account.</comment>
+        <createTable tableName="platform_admin">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="username" type="varchar(100)"><constraints nullable="false"/></column>
+            <column name="password_hash" type="varchar(255)"><constraints nullable="false"/></column>
+            <column name="full_name" type="varchar(255)"><constraints nullable="false"/></column>
+            <column name="is_active" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+    <!-- 7. Device -->
+    <changeSet id="001-07-create-device" author="system">
+        <comment>Physical device for offline capture.</comment>
+        <createTable tableName="device">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="app_user_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="device_label" type="varchar(100)"/>
+            <column name="app_version" type="varchar(20)"/>
+            <column name="last_sync_at" type="timestamp"/>
+            <column name="is_active" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+    <!-- 8. Role permission -->
+    <changeSet id="001-08-create-role-permission" author="system">
+        <comment>Maps roles to their granted permissions</comment>
+        <createTable tableName="role_permission">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="role_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="permission_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="granted_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="granted_by" type="uuid"/>
+        </createTable>
+    </changeSet>
+    <!-- 9. Learner -->
+    <changeSet id="001-09-create-learner" author="system">
+        <comment>Learner record with offline-sync bookkeeping.</comment>
+        <createTable tableName="learner">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="school_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="first_name" type="varchar(100)"><constraints nullable="false"/></column>
+            <column name="last_name" type="varchar(100)"><constraints nullable="false"/></column>
+            <column name="learner_number" type="varchar(50)"><constraints nullable="false"/></column>
+            <column name="grade_level_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="date_of_birth" type="date"/>
+            <column name="sex" type="varchar(10)"/>
+            <column name="previous_school_name" type="varchar(255)"/>
+            <column name="is_active" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="change_id" type="uuid"/>
+            <column name="sync_status" type="varchar(20)" defaultValue="SYNCED">
+                <constraints nullable="false"/>
+            </column>
+            <column name="source_device_id" type="uuid"/>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by" type="uuid"/>
+            <column name="updated_by" type="uuid"/>
+        </createTable>
+    </changeSet>
+    <!-- 10. Class section -->
+    <changeSet id="001-10-create-class-section" author="system">
+        <comment>Class/section within a school.</comment>
+        <createTable tableName="class_section">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="school_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="name" type="varchar(100)"><constraints nullable="false"/></column>
+            <column name="grade_level_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="academic_year_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="class_teacher_id" type="uuid"/>
+            <column name="capacity" type="integer"/>
+            <column name="is_active" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by" type="uuid"/>
+            <column name="updated_by" type="uuid"/>
+        </createTable>
+    </changeSet>
+    <!-- 11. Enrollment -->
+    <changeSet id="001-11-create-enrollment" author="system">
+        <comment>Time-bound link between learner and class.</comment>
+        <createTable tableName="enrollment">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="school_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="learner_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="class_section_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="academic_year_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="enrollment_date" type="date"><constraints nullable="false"/></column>
+            <column name="withdrawal_date" type="date"/>
+            <column name="status" type="varchar(20)" defaultValue="ACTIVE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="enrollment_type" type="varchar(20)" defaultValue="NEW">
+                <constraints nullable="false"/>
+            </column>
+            <column name="change_id" type="uuid"/>
+            <column name="sync_status" type="varchar(20)" defaultValue="SYNCED">
+                <constraints nullable="false"/>
+            </column>
+            <column name="source_device_id" type="uuid"/>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by" type="uuid"/>
+            <column name="updated_by" type="uuid"/>
+        </createTable>
+    </changeSet>
+    <!-- 12. Attendance -->
+    <changeSet id="001-12-create-attendance" author="system">
+        <comment>One authoritative record per learner/class/date.</comment>
+        <createTable tableName="attendance">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="school_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="learner_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="class_section_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="attendance_date" type="date"><constraints nullable="false"/></column>
+            <column name="attendance_status_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="absence_reason_id" type="uuid"/>
+            <column name="notes" type="text"/>
+            <column name="recorded_by" type="uuid"/>
+            <column name="recorded_at" type="timestamp"><constraints nullable="false"/></column>
+            <column name="server_received_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="change_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="sync_status" type="varchar(20)" defaultValue="PENDING">
+                <constraints nullable="false"/>
+            </column>
+            <column name="source_device_id" type="uuid"/>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by" type="uuid"/>
+            <column name="updated_by" type="uuid"/>
+        </createTable>
+    </changeSet>
+    <!-- 13. Change log -->
+    <changeSet id="001-13-create-change-log" author="system">
+        <comment>Append-only audit trail for sync.</comment>
+        <createTable tableName="change_log">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="school_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="entity_type" type="varchar(50)"><constraints nullable="false"/></column>
+            <column name="entity_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="operation_type" type="varchar(20)"><constraints nullable="false"/></column>
+            <column name="change_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="changed_data" type="jsonb"><constraints nullable="false"/></column>
+            <column name="previous_data" type="jsonb"/>
+            <column name="changed_by" type="uuid"/>
+            <column name="sync_status" type="varchar(20)" defaultValue="PENDING">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by" type="uuid"/>
+            <column name="updated_by" type="uuid"/>
+        </createTable>
+    </changeSet>
+    <!-- 14. Sync conflict -->
+    <changeSet id="001-14-create-sync-conflict" author="system">
+        <comment>Actionable worklist for unresolved sync conflicts</comment>
+        <createTable tableName="sync_conflict">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="school_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="entity_type" type="varchar(50)"><constraints nullable="false"/></column>
+            <column name="entity_id" type="uuid"><constraints nullable="false"/></column>
+            <column name="conflict_type" type="varchar(50)"><constraints nullable="false"/></column>
+            <column name="losing_change_id" type="uuid"/>
+            <column name="winning_change_id" type="uuid"/>
+            <column name="detected_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="varchar(20)" defaultValue="PENDING">
+                <constraints nullable="false"/>
+            </column>
+            <column name="resolved_by" type="uuid"/>
+            <column name="resolved_at" type="timestamp"/>
+            <column name="resolution_notes" type="text"/>
+            <column name="created_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+    <!-- 15. Learner ID sequence -->
+    <changeSet id="001-15-create-learner-id-sequence" author="system">
+        <comment>Atomic counter per school per academic year.</comment>
+        <createTable tableName="learner_id_sequence">
+            <column name="school_id" type="uuid">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_learner_id_sequence"/>
+            </column>
+            <column name="year" type="integer">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_learner_id_sequence"/>
+            </column>
+            <column name="current_value" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+    <changeSet id="001-16-add-tenant-code-constraint" author="system">
+        <comment>Enforce tenant code format: exactly 6 uppercase alphanumeric characters</comment>
+        <sql>
+            ALTER TABLE tenant
+                ADD CONSTRAINT ck_tenant_code_format
+                    CHECK (code ~ '^[A-Z0-9]{6}$');
+        </sql>
+    </changeSet>
+    <!-- ===================================================================== -->
+    <!-- PHASE 2: FOREIGN KEYS                                                 -->
+    <!-- ===================================================================== -->
+    <changeSet id="001-17-add-foreign-keys" author="system">
+        <comment>All foreign key constraints</comment>
+        <!-- tenant -->
+        <addForeignKeyConstraint baseTableName="tenant" baseColumnNames="created_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_tenant_created_by" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="tenant" baseColumnNames="updated_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_tenant_updated_by" onDelete="SET NULL"/>
+        <!-- school -->
+        <addForeignKeyConstraint baseTableName="school" baseColumnNames="tenant_id"
+                                 referencedTableName="tenant" referencedColumnNames="id"
+                                 constraintName="fk_school_tenant" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="school" baseColumnNames="academic_year_id"
+                                 referencedTableName="code_set" referencedColumnNames="id"
+                                 constraintName="fk_school_academic_year" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="school" baseColumnNames="current_term_id"
+                                 referencedTableName="code_set" referencedColumnNames="id"
+                                 constraintName="fk_school_current_term" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="school" baseColumnNames="created_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_school_created_by" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="school" baseColumnNames="updated_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_school_updated_by" onDelete="SET NULL"/>
+        <!-- ✅ CHANGED: code_set now references tenant, not school -->
+        <addForeignKeyConstraint baseTableName="code_set" baseColumnNames="tenant_id"
+                                 referencedTableName="tenant" referencedColumnNames="id"
+                                 constraintName="fk_code_set_tenant" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="code_set" baseColumnNames="created_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_code_set_created_by" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="code_set" baseColumnNames="updated_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_code_set_updated_by" onDelete="SET NULL"/>
+        <!-- role -->
+        <addForeignKeyConstraint baseTableName="role" baseColumnNames="school_id"
+                                 referencedTableName="school" referencedColumnNames="id"
+                                 constraintName="fk_role_school" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="role" baseColumnNames="tenant_id"
+                                 referencedTableName="tenant" referencedColumnNames="id"
+                                 constraintName="fk_role_tenant" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="role" baseColumnNames="created_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_role_created_by" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="role" baseColumnNames="updated_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_role_updated_by" onDelete="SET NULL"/>
+        <!-- app_user -->
+        <addForeignKeyConstraint baseTableName="app_user" baseColumnNames="tenant_id"
+                                 referencedTableName="tenant" referencedColumnNames="id"
+                                 constraintName="fk_app_user_tenant" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="app_user" baseColumnNames="role_id"
+                                 referencedTableName="role" referencedColumnNames="id"
+                                 constraintName="fk_app_user_role" onDelete="RESTRICT"/>
+        <addForeignKeyConstraint baseTableName="app_user" baseColumnNames="created_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_app_user_created_by" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="app_user" baseColumnNames="updated_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_app_user_updated_by" onDelete="SET NULL"/>
+        <!-- app_user_school -->
+        <addForeignKeyConstraint baseTableName="app_user_school" baseColumnNames="app_user_id"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_app_user_school_user" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="app_user_school" baseColumnNames="school_id"
+                                 referencedTableName="school" referencedColumnNames="id"
+                                 constraintName="fk_app_user_school_school" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="app_user_school" baseColumnNames="assigned_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_app_user_school_assigned_by" onDelete="SET NULL"/>
+        <!-- device -->
+        <addForeignKeyConstraint baseTableName="device" baseColumnNames="app_user_id"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_device_app_user" onDelete="CASCADE"/>
+        <!-- role_permission -->
+        <addForeignKeyConstraint baseTableName="role_permission" baseColumnNames="role_id"
+                                 referencedTableName="role" referencedColumnNames="id"
+                                 constraintName="fk_role_permission_role" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="role_permission" baseColumnNames="permission_id"
+                                 referencedTableName="permission" referencedColumnNames="id"
+                                 constraintName="fk_role_permission_permission" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="role_permission" baseColumnNames="granted_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_role_permission_granted_by" onDelete="SET NULL"/>
+        <!-- learner -->
+        <addForeignKeyConstraint baseTableName="learner" baseColumnNames="school_id"
+                                 referencedTableName="school" referencedColumnNames="id"
+                                 constraintName="fk_learner_school" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="learner" baseColumnNames="grade_level_id"
+                                 referencedTableName="code_set" referencedColumnNames="id"
+                                 constraintName="fk_learner_grade_level" onDelete="RESTRICT"/>
+        <addForeignKeyConstraint baseTableName="learner" baseColumnNames="source_device_id"
+                                 referencedTableName="device" referencedColumnNames="id"
+                                 constraintName="fk_learner_device" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="learner" baseColumnNames="created_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_learner_created_by" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="learner" baseColumnNames="updated_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_learner_updated_by" onDelete="SET NULL"/>
+        <!-- class_section -->
+        <addForeignKeyConstraint baseTableName="class_section" baseColumnNames="school_id"
+                                 referencedTableName="school" referencedColumnNames="id"
+                                 constraintName="fk_class_section_school" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="class_section" baseColumnNames="grade_level_id"
+                                 referencedTableName="code_set" referencedColumnNames="id"
+                                 constraintName="fk_class_section_grade_level" onDelete="RESTRICT"/>
+        <addForeignKeyConstraint baseTableName="class_section" baseColumnNames="academic_year_id"
+                                 referencedTableName="code_set" referencedColumnNames="id"
+                                 constraintName="fk_class_section_academic_year" onDelete="RESTRICT"/>
+        <addForeignKeyConstraint baseTableName="class_section" baseColumnNames="class_teacher_id"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_class_section_teacher" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="class_section" baseColumnNames="created_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_class_section_created_by" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="class_section" baseColumnNames="updated_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_class_section_updated_by" onDelete="SET NULL"/>
+        <!-- enrollment -->
+        <addForeignKeyConstraint baseTableName="enrollment" baseColumnNames="school_id"
+                                 referencedTableName="school" referencedColumnNames="id"
+                                 constraintName="fk_enrollment_school" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="enrollment" baseColumnNames="learner_id"
+                                 referencedTableName="learner" referencedColumnNames="id"
+                                 constraintName="fk_enrollment_learner" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="enrollment" baseColumnNames="class_section_id"
+                                 referencedTableName="class_section" referencedColumnNames="id"
+                                 constraintName="fk_enrollment_class_section" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="enrollment" baseColumnNames="academic_year_id"
+                                 referencedTableName="code_set" referencedColumnNames="id"
+                                 constraintName="fk_enrollment_academic_year" onDelete="RESTRICT"/>
+        <addForeignKeyConstraint baseTableName="enrollment" baseColumnNames="source_device_id"
+                                 referencedTableName="device" referencedColumnNames="id"
+                                 constraintName="fk_enrollment_device" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="enrollment" baseColumnNames="created_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_enrollment_created_by" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="enrollment" baseColumnNames="updated_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_enrollment_updated_by" onDelete="SET NULL"/>
+        <!-- attendance -->
+        <addForeignKeyConstraint baseTableName="attendance" baseColumnNames="school_id"
+                                 referencedTableName="school" referencedColumnNames="id"
+                                 constraintName="fk_attendance_school" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="attendance" baseColumnNames="learner_id"
+                                 referencedTableName="learner" referencedColumnNames="id"
+                                 constraintName="fk_attendance_learner" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="attendance" baseColumnNames="class_section_id"
+                                 referencedTableName="class_section" referencedColumnNames="id"
+                                 constraintName="fk_attendance_class_section" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="attendance" baseColumnNames="attendance_status_id"
+                                 referencedTableName="code_set" referencedColumnNames="id"
+                                 constraintName="fk_attendance_status" onDelete="RESTRICT"/>
+        <addForeignKeyConstraint baseTableName="attendance" baseColumnNames="absence_reason_id"
+                                 referencedTableName="code_set" referencedColumnNames="id"
+                                 constraintName="fk_attendance_absence_reason" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="attendance" baseColumnNames="recorded_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_attendance_recorded_by" onDelete="NO ACTION"/>
+        <addForeignKeyConstraint baseTableName="attendance" baseColumnNames="source_device_id"
+                                 referencedTableName="device" referencedColumnNames="id"
+                                 constraintName="fk_attendance_device" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="attendance" baseColumnNames="created_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_attendance_created_by" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="attendance" baseColumnNames="updated_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_attendance_updated_by" onDelete="SET NULL"/>
+        <!-- change_log -->
+        <addForeignKeyConstraint baseTableName="change_log" baseColumnNames="school_id"
+                                 referencedTableName="school" referencedColumnNames="id"
+                                 constraintName="fk_change_log_school" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="change_log" baseColumnNames="changed_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_change_log_changed_by" onDelete="NO ACTION"/>
+        <addForeignKeyConstraint baseTableName="change_log" baseColumnNames="created_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_change_log_created_by" onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="change_log" baseColumnNames="updated_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_change_log_updated_by" onDelete="SET NULL"/>
+        <!-- sync_conflict -->
+        <addForeignKeyConstraint baseTableName="sync_conflict" baseColumnNames="school_id"
+                                 referencedTableName="school" referencedColumnNames="id"
+                                 constraintName="fk_sync_conflict_school" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="sync_conflict" baseColumnNames="resolved_by"
+                                 referencedTableName="app_user" referencedColumnNames="id"
+                                 constraintName="fk_sync_conflict_resolved_by" onDelete="SET NULL"/>
+        <!-- learner_id_sequence -->
+        <addForeignKeyConstraint baseTableName="learner_id_sequence" baseColumnNames="school_id"
+                                 referencedTableName="school" referencedColumnNames="id"
+                                 constraintName="fk_learner_id_sequence_school" onDelete="CASCADE"/>
+    </changeSet>
+    <!-- ===================================================================== -->
+    <!-- PHASE 3: UNIQUE CONSTRAINTS                                           -->
+    <!-- ===================================================================== -->
+    <changeSet id="001-18-add-unique-constraints" author="system">
+        <comment>Uniqueness rules for data integrity</comment>
+        <addUniqueConstraint tableName="tenant" columnNames="code"
+                             constraintName="uk_tenant_code"/>
+        <addUniqueConstraint tableName="school" columnNames="code"
+                             constraintName="uk_school_code"/>
+        <addUniqueConstraint tableName="app_user" columnNames="username"
+                             constraintName="uk_app_user_username"/>
+        <addUniqueConstraint tableName="permission" columnNames="code"
+                             constraintName="uk_permission_code"/>
+        <addUniqueConstraint tableName="app_user_school" columnNames="app_user_id, school_id"
+                             constraintName="uk_app_user_school"/>
+        <addUniqueConstraint tableName="platform_admin" columnNames="username"
+                             constraintName="uk_platform_admin_username"/>
+        <!-- ✅ CHANGED: unique per tenant (not per school) -->
+        <addUniqueConstraint tableName="code_set"
+                             columnNames="tenant_id, code_set_group, code"
+                             constraintName="uk_code_set_tenant_group_code"/>
+        <addUniqueConstraint tableName="learner"
+                             columnNames="school_id, learner_number"
+                             constraintName="uk_learner_school_learner_number"/>
+        <addUniqueConstraint tableName="learner" columnNames="change_id"
+                             constraintName="uk_learner_change_id"/>
+        <addUniqueConstraint tableName="class_section"
+                             columnNames="school_id, name, academic_year_id"
+                             constraintName="uk_class_section_school_name_year"/>
+        <addUniqueConstraint tableName="enrollment" columnNames="change_id"
+                             constraintName="uk_enrollment_change_id"/>
+        <addUniqueConstraint tableName="attendance"
+                             columnNames="learner_id, class_section_id, attendance_date"
+                             constraintName="uk_attendance_learner_class_date"/>
+        <addUniqueConstraint tableName="attendance" columnNames="change_id"
+                             constraintName="uk_attendance_change_id"/>
+        <addUniqueConstraint tableName="role_permission"
+                             columnNames="role_id, permission_id"
+                             constraintName="uk_role_permission"/>
+        <sql>
+            CREATE UNIQUE INDEX uk_enrollment_learner_active_year
+                ON enrollment (learner_id, academic_year_id)
+                WHERE status = 'ACTIVE';
+        </sql>
+    </changeSet>
+    <!-- ===================================================================== -->
+    <!-- PHASE 4: INDEXES                                                      -->
+    <!-- ===================================================================== -->
+    <changeSet id="001-19-add-indexes" author="system">
+        <comment>Indexes for query performance</comment>
+        <createIndex tableName="school" indexName="idx_school_tenant">
+            <column name="tenant_id"/>
+        </createIndex>
+        <!-- ✅ CHANGED: index on tenant_id instead of school_id -->
+        <createIndex tableName="code_set" indexName="idx_code_set_tenant">
+            <column name="tenant_id"/>
+        </createIndex>
+        <createIndex tableName="code_set" indexName="idx_code_set_group">
+            <column name="code_set_group"/>
+        </createIndex>
+        <createIndex tableName="app_user" indexName="idx_app_user_tenant">
+            <column name="tenant_id"/>
+        </createIndex>
+        <createIndex tableName="app_user" indexName="idx_app_user_role">
+            <column name="role_id"/>
+        </createIndex>
+        <createIndex tableName="app_user_school" indexName="idx_app_user_school_user">
+            <column name="app_user_id"/>
+        </createIndex>
+        <createIndex tableName="app_user_school" indexName="idx_app_user_school_school">
+            <column name="school_id"/>
+        </createIndex>
+        <createIndex tableName="device" indexName="idx_device_app_user">
+            <column name="app_user_id"/>
+        </createIndex>
+        <createIndex tableName="role" indexName="idx_role_school">
+            <column name="school_id"/>
+        </createIndex>
+        <createIndex tableName="role" indexName="idx_role_tenant">
+            <column name="tenant_id"/>
+        </createIndex>
+        <createIndex tableName="role_permission" indexName="idx_role_permission_role">
+            <column name="role_id"/>
+        </createIndex>
+        <createIndex tableName="learner" indexName="idx_learner_school">
+            <column name="school_id"/>
+        </createIndex>
+        <createIndex tableName="learner" indexName="idx_learner_learner_number">
+            <column name="learner_number"/>
+        </createIndex>
+        <createIndex tableName="learner" indexName="idx_learner_grade_level">
+            <column name="grade_level_id"/>
+        </createIndex>
+        <createIndex tableName="learner" indexName="idx_learner_sync_status">
+            <column name="sync_status"/>
+        </createIndex>
+        <createIndex tableName="learner" indexName="idx_learner_source_device">
+            <column name="source_device_id"/>
+        </createIndex>
+        <createIndex tableName="class_section" indexName="idx_class_section_school">
+            <column name="school_id"/>
+        </createIndex>
+        <createIndex tableName="class_section" indexName="idx_class_section_academic_year">
+            <column name="academic_year_id"/>
+        </createIndex>
+        <createIndex tableName="enrollment" indexName="idx_enrollment_school">
+            <column name="school_id"/>
+        </createIndex>
+        <createIndex tableName="enrollment" indexName="idx_enrollment_class_section">
+            <column name="class_section_id"/>
+        </createIndex>
+        <createIndex tableName="enrollment" indexName="idx_enrollment_learner">
+            <column name="learner_id"/>
+        </createIndex>
+        <createIndex tableName="enrollment" indexName="idx_enrollment_academic_year">
+            <column name="academic_year_id"/>
+        </createIndex>
+        <createIndex tableName="enrollment" indexName="idx_enrollment_sync_status">
+            <column name="sync_status"/>
+        </createIndex>
+        <createIndex tableName="attendance" indexName="idx_attendance_school">
+            <column name="school_id"/>
+        </createIndex>
+        <createIndex tableName="attendance" indexName="idx_attendance_date">
+            <column name="attendance_date"/>
+        </createIndex>
+        <createIndex tableName="attendance" indexName="idx_attendance_class_section">
+            <column name="class_section_id"/>
+        </createIndex>
+        <createIndex tableName="attendance" indexName="idx_attendance_sync_status">
+            <column name="sync_status"/>
+        </createIndex>
+        <createIndex tableName="attendance" indexName="idx_attendance_source_device">
+            <column name="source_device_id"/>
+        </createIndex>
+        <createIndex tableName="change_log" indexName="idx_change_log_school">
+            <column name="school_id"/>
+        </createIndex>
+        <createIndex tableName="change_log" indexName="idx_change_log_entity">
+            <column name="entity_type"/>
+            <column name="entity_id"/>
+        </createIndex>
+        <createIndex tableName="change_log" indexName="idx_change_log_sync_status">
+            <column name="sync_status"/>
+        </createIndex>
+        <createIndex tableName="sync_conflict" indexName="idx_sync_conflict_school">
+            <column name="school_id"/>
+        </createIndex>
+        <createIndex tableName="sync_conflict" indexName="idx_sync_conflict_entity">
+            <column name="entity_type"/>
+            <column name="entity_id"/>
+        </createIndex>
+        <createIndex tableName="sync_conflict" indexName="idx_sync_conflict_status">
+            <column name="status"/>
+        </createIndex>
+    </changeSet>
+    <!-- ===================================================================== -->
+    <!-- PHASE 5: ROW-LEVEL SECURITY                                           -->
+    <!-- ===================================================================== -->
+    <changeSet id="001-20-enable-rls" author="system">
+        <comment>Enable RLS on all school/tenant-scoped tables.
+            ✅ CHANGED: code_set RLS now checks tenant_id directly (simpler).</comment>
+        <sql>
+            ALTER TABLE tenant ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE school ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE code_set ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE app_user_school ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE learner ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE class_section ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE enrollment ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE attendance ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE change_log ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE sync_conflict ENABLE ROW LEVEL SECURITY;
+        </sql>
+        <sql>
+            CREATE POLICY tenant_isolation ON tenant
+USING (
+current_setting('app.is_platform_admin', true) = 'true'
+OR id::text = current_setting('app.current_tenant_id', true)
+);
+CREATE POLICY school_isolation ON school
+USING (
+current_setting('app.is_platform_admin', true) = 'true'
+OR tenant_id::text = current_setting('app.current_tenant_id', true)
+OR id IN (
+SELECT school_id FROM app_user_school
+WHERE app_user_id::text = current_setting('app.current_user_id', true)
+)
+);
+CREATE POLICY app_user_school_isolation ON app_user_school
+USING (
+current_setting('app.is_platform_admin', true) = 'true'
+OR app_user_id::text = current_setting('app.current_user_id', true)
+OR school_id IN (
+SELECT id FROM school
+WHERE tenant_id::text = current_setting('app.current_tenant_id', true)
+)
+);
+-- ✅ CHANGED: code_set now filters directly by tenant_id (no school join needed)
+CREATE POLICY code_set_isolation ON code_set
+USING (
+current_setting('app.is_platform_admin', true) = 'true'
+OR tenant_id::text = current_setting('app.current_tenant_id', true)
+);
+CREATE POLICY learner_isolation ON learner
+USING (
+current_setting('app.is_platform_admin', true) = 'true'
+OR school_id IN (
+SELECT id FROM school
+WHERE tenant_id::text = current_setting('app.current_tenant_id', true)
+)
+OR school_id IN (
+SELECT school_id FROM app_user_school
+WHERE app_user_id::text = current_setting('app.current_user_id', true)
+)
+);
+CREATE POLICY class_section_isolation ON class_section
+USING (
+current_setting('app.is_platform_admin', true) = 'true'
+OR school_id IN (
+SELECT id FROM school
+WHERE tenant_id::text = current_setting('app.current_tenant_id', true)
+)
+OR school_id IN (
+SELECT school_id FROM app_user_school
+WHERE app_user_id::text = current_setting('app.current_user_id', true)
+)
+);
+CREATE POLICY enrollment_isolation ON enrollment
+USING (
+current_setting('app.is_platform_admin', true) = 'true'
+OR school_id IN (
+SELECT id FROM school
+WHERE tenant_id::text = current_setting('app.current_tenant_id', true)
+)
+OR school_id IN (
+SELECT school_id FROM app_user_school
+WHERE app_user_id::text = current_setting('app.current_user_id', true)
+)
+);
+CREATE POLICY attendance_isolation ON attendance
+USING (
+current_setting('app.is_platform_admin', true) = 'true'
+OR school_id IN (
+SELECT id FROM school
+WHERE tenant_id::text = current_setting('app.current_tenant_id', true)
+)
+OR school_id IN (
+SELECT school_id FROM app_user_school
+WHERE app_user_id::text = current_setting('app.current_user_id', true)
+)
+);
+CREATE POLICY change_log_isolation ON change_log
+USING (
+current_setting('app.is_platform_admin', true) = 'true'
+OR school_id IN (
+SELECT id FROM school
+WHERE tenant_id::text = current_setting('app.current_tenant_id', true)
+)
+OR school_id IN (
+SELECT school_id FROM app_user_school
+WHERE app_user_id::text = current_setting('app.current_user_id', true)
+)
+);
+CREATE POLICY sync_conflict_isolation ON sync_conflict
+USING (
+current_setting('app.is_platform_admin', true) = 'true'
+OR school_id IN (
+SELECT id FROM school
+WHERE tenant_id::text = current_setting('app.current_tenant_id', true)
+)
+OR school_id IN (
+SELECT school_id FROM app_user_school
+WHERE app_user_id::text = current_setting('app.current_user_id', true)
+)
+);
+        </sql>
+    </changeSet>
+    <!-- ===================================================================== -->
+    <!-- PHASE 6: ADDITIONAL CONSTRAINTS                                       -->
+    <!-- ===================================================================== -->
+    <changeSet id="001-21-tenant-contact-uniqueness" author="system">
+        <comment>Enforce uniqueness on tenant contact email and phone</comment>
+        <addUniqueConstraint tableName="tenant" columnNames="contact_email" constraintName="uk_tenant_contact_email"/>
+        <addUniqueConstraint tableName="tenant" columnNames="contact_phone" constraintName="uk_tenant_contact_phone"/>
+    </changeSet>
+</databaseChangeLog>

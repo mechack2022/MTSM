@@ -18,7 +18,7 @@ import java.util.UUID;
 @Getter
 @Setter
 @MappedSuperclass
-@SuperBuilder          // ✅ REQUIRED for inheritance
+@SuperBuilder
 @NoArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
 public abstract class BaseAuditableEntity {

@@ -25,12 +25,27 @@ public class GlobalExceptionHandler {
         this.messageResolver = messageResolver;
     }
 
+
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusinessException(
             BusinessException ex, HttpServletRequest request) {
 
         MessageKey key = ex.getMessageKey();
-        return buildErrorResponse(key, request.getRequestURI());
+        String baseMessage = messageResolver.getMessage(key);
+
+        String finalMessage = ex.getDetail() != null
+                ? baseMessage.replace("{0}", ex.getDetail())
+                : baseMessage;
+
+        ApiError error = new ApiError(key.getErrorCode(), finalMessage);
+        ApiResponse<Void> response = ApiResponse.error(
+                key.getHttpStatus().value(),
+                finalMessage,
+                error,
+                request.getRequestURI()
+        );
+
+        return ResponseEntity.status(key.getHttpStatus()).body(response);
     }
 
     // --- Handles Spring Security Bad Credentials ---

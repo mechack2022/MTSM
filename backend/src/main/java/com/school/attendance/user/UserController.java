@@ -24,9 +24,8 @@ public class UserController {
     private final UserService userService;
     private final MessageResolver messageResolver;
 
-    // 🔒 RBAC: Only ADMIN can create users
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USER_CREATE')")
     public ResponseEntity<ApiResponse<UserResponse>> createUser(
             @Valid @RequestBody CreateUserRequest request,
             HttpServletRequest httpRequest) {
@@ -42,7 +41,7 @@ public class UserController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_TEACHER')")
+    @PreAuthorize("hasAuthority('USER_READ')")
     public ResponseEntity<ApiResponse<List<UserResponse>>> getAllUsers(
             HttpServletRequest httpRequest) {
         List<UserResponse> users = userService.getAllUsers();
@@ -57,36 +56,69 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_TEACHER')")
-    public ResponseEntity<ApiResponse<UserResponse>> getUserById(@PathVariable UUID id, HttpServletRequest req) {
-        return ResponseEntity.ok(ApiResponse.success(200, messageResolver.getMessage(MessageKey.USER_GET_SUCCESS), userService.getUserById(id), req.getRequestURI()));
+    @PreAuthorize("hasAuthority('USER_READ')")
+    public ResponseEntity<ApiResponse<UserResponse>> getUserById(
+            @PathVariable UUID id,
+            HttpServletRequest req) {
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        200,
+                        messageResolver.getMessage(MessageKey.USER_GET_SUCCESS),
+                        userService.getUserById(id),
+                        req.getRequestURI()
+                )
+        );
     }
 
-
     @GetMapping("/me")
+    @PreAuthorize("hasAuthority('USER_READ')")
     public ResponseEntity<ApiResponse<UserResponse>> getCurrentUser(HttpServletRequest req) {
-        return ResponseEntity.ok(ApiResponse.success(200, messageResolver.getMessage(MessageKey.USER_ME_SUCCESS), userService.getCurrentUser(), req.getRequestURI()));
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        200,
+                        messageResolver.getMessage(MessageKey.USER_GET_SUCCESS),
+                        userService.getCurrentUser(),
+                        req.getRequestURI()
+                )
+        );
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USER_UPDATE')")
     public ResponseEntity<ApiResponse<UserResponse>> updateUser(
-            @PathVariable UUID id, @Valid @RequestBody UpdateUserRequest request, HttpServletRequest req) {
-        return ResponseEntity.ok(ApiResponse.success(200, messageResolver.getMessage(MessageKey.USER_UPDATE_SUCCESS),
-                userService.updateUser(id, request), req.getRequestURI()));
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateUserRequest request,
+            HttpServletRequest req) {
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        200,
+                        messageResolver.getMessage(MessageKey.USER_UPDATE_SUCCESS),
+                        userService.updateUser(id, request),
+                        req.getRequestURI()
+                )
+        );
     }
 
     @PatchMapping("/{id}/deactivate")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<UserResponse>> deactivateUser(@PathVariable UUID id, HttpServletRequest req) {
-        return ResponseEntity.ok(ApiResponse.success(200, messageResolver.getMessage(MessageKey.USER_DEACTIVATE_SUCCESS), userService.deactivateUser(id), req.getRequestURI()));
+    @PreAuthorize("hasAuthority('USER_DEACTIVATE')")
+    public ResponseEntity<ApiResponse<UserResponse>> deactivateUser(
+            @PathVariable UUID id,
+            HttpServletRequest req) {
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        200,
+                        messageResolver.getMessage(MessageKey.USER_DEACTIVATE_SUCCESS),
+                        userService.deactivateUser(id),
+                        req.getRequestURI()
+                )
+        );
     }
 
     @PatchMapping("/{id}/activate")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USER_UPDATE')")
     public ResponseEntity<ApiResponse<UserResponse>> activateUser(
-            @PathVariable UUID id, HttpServletRequest req) {
-
+            @PathVariable UUID id,
+            HttpServletRequest req) {
         return ResponseEntity.ok(
                 ApiResponse.success(
                         200,

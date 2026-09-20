@@ -16,23 +16,28 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 
+import com.school.attendance.security.CustomUserDetails;
+import org.springframework.security.core.context.SecurityContextHolder;
+
+
 @Service
 @RequiredArgsConstructor
 public class CodeSetService {
 
     private final CodeSetRepository codeSetRepository;
-    private final SchoolRepository schoolRepository;
     private final CodeSetMapper codeSetMapper;
 
     @Transactional
     public CodeSetResponse createCodeSet(CodeSetRequest request) {
-        UUID schoolId = getSchoolId();
-        if (codeSetRepository.existsBySchoolIdAndCodeSetGroupAndCode(
-                schoolId, request.codeSetGroup(), request.code())) {
+        UUID tenantId = resolveTenantId(request.targetTenantId());
+
+        if (codeSetRepository.existsByTenantIdAndCodeSetGroupAndCode(
+                tenantId, request.codeSetGroup(), request.code())) {
             throw new BusinessException(MessageKey.CODESET_ALREADY_EXISTS);
         }
+
         CodeSet codeSet = CodeSet.builder()
-                .schoolId(schoolId)
+                .tenantId(tenantId)
                 .codeSetGroup(request.codeSetGroup())
                 .code(request.code().trim().toUpperCase())
                 .displayName(request.displayName().trim())
@@ -46,9 +51,9 @@ public class CodeSetService {
     }
 
     public List<CodeSetResponse> getActiveCodeSetsByGroup(CodeSetGroup group) {
-        UUID schoolId = getSchoolId();
+        UUID tenantId = getTenantId();
         return codeSetRepository
-                .findBySchoolIdAndCodeSetGroupAndIsActiveTrueOrderBySortOrderAsc(schoolId, group)
+                .findByTenantIdAndCodeSetGroupAndIsActiveTrueOrderBySortOrderAsc(tenantId, group)
                 .stream()
                 .map(codeSetMapper::toDto)
                 .toList();
@@ -59,9 +64,9 @@ public class CodeSetService {
      * Useful for admin management screens.
      */
     public List<CodeSetResponse> getAllCodeSetsByGroup(CodeSetGroup group) {
-        UUID schoolId = getSchoolId();
+        UUID tenantId = getTenantId();
         return codeSetRepository
-                .findBySchoolIdAndCodeSetGroupOrderBySortOrderAsc(schoolId, group)
+                .findByTenantIdAndCodeSetGroupOrderBySortOrderAsc(tenantId, group)
                 .stream()
                 .map(codeSetMapper::toDto)
                 .toList();
@@ -71,25 +76,23 @@ public class CodeSetService {
      * Get a single code set by ID.
      */
     public CodeSetResponse getCodeSetById(UUID id) {
-        UUID schoolId = getSchoolId();
-
+        UUID tenantId = getTenantId();
         return codeSetRepository.findById(id)
-                .filter(cs -> cs.getSchoolId().equals(schoolId)) // Ensure it belongs to this school
+                .filter(cs -> cs.getTenantId().equals(tenantId)) // Ensure it belongs to this tenant
                 .map(codeSetMapper::toDto)
                 .orElseThrow(() -> new BusinessException(MessageKey.CODESET_NOT_FOUND));
     }
 
     @Transactional
     public CodeSetResponse updateCodeSet(UUID id, CodeSetRequest request) {
-        UUID schoolId = getSchoolId();
-
+        UUID tenantId = getTenantId();
         CodeSet codeSet = codeSetRepository.findById(id)
-                .filter(cs -> cs.getSchoolId().equals(schoolId))
+                .filter(cs -> cs.getTenantId().equals(tenantId))
                 .orElseThrow(() -> new BusinessException(MessageKey.CODESET_NOT_FOUND));
 
         if (!codeSet.getCode().equalsIgnoreCase(request.code())) {
-            if (codeSetRepository.existsBySchoolIdAndCodeSetGroupAndCode(
-                    schoolId, request.codeSetGroup(), request.code())) {
+            if (codeSetRepository.existsByTenantIdAndCodeSetGroupAndCode(
+                    tenantId, request.codeSetGroup(), request.code())) {
                 throw new BusinessException(MessageKey.CODESET_ALREADY_EXISTS);
             }
         }
@@ -107,7 +110,6 @@ public class CodeSetService {
     @Transactional
     public CodeSetResponse deactivateCodeSet(UUID id) {
         CodeSet codeSet = findCodeSetById(id);
-
         if (!codeSet.getIsActive()) {
             throw new BusinessException(MessageKey.CODESET_ALREADY_DEACTIVATED);
         }
@@ -122,39 +124,73 @@ public class CodeSetService {
     @Transactional
     public CodeSetResponse activateCodeSet(UUID id) {
         CodeSet codeSet = findCodeSetById(id);
-
         if (codeSet.getIsActive()) {
             throw new BusinessException(MessageKey.CODESET_ALREADY_ACTIVE);
         }
-
         codeSet.setIsActive(true);
         return codeSetMapper.toDto(codeSetRepository.save(codeSet));
     }
 
     public void validateCodeExists(CodeSetGroup group, UUID codeSetId) {
-        UUID schoolId = getSchoolId();
-
+        UUID tenantId = getTenantId();
         CodeSet codeSet = codeSetRepository.findById(codeSetId)
                 .orElseThrow(() -> new BusinessException(MessageKey.CODESET_NOT_FOUND));
 
-        if (!codeSet.getSchoolId().equals(schoolId)
+        if (!codeSet.getTenantId().equals(tenantId)
                 || !codeSet.getCodeSetGroup().equals(group)
                 || !codeSet.getIsActive()) {
             throw new BusinessException(MessageKey.CODESET_NOT_FOUND);
         }
     }
 
+    // ══════════════════════════════════════════════════════════════
+    // TENANT RESOLUTION HELPERS
+    // ══════════════════════════════════════════════════════════════
 
     private CodeSet findCodeSetById(UUID id) {
-        UUID schoolId = getSchoolId();
+        UUID tenantId = getTenantId();
         return codeSetRepository.findById(id)
-                .filter(cs -> cs.getSchoolId().equals(schoolId))
+                .filter(cs -> cs.getTenantId().equals(tenantId))
                 .orElseThrow(() -> new BusinessException(MessageKey.CODESET_NOT_FOUND));
     }
 
-    private UUID getSchoolId() {
-        return schoolRepository.findFirstByOrderByIdAsc()
-                .map(school -> school.getId())
-                .orElseThrow(() -> new BusinessException(MessageKey.INTERNAL_ERROR));
+    /**
+     * Resolves the tenant ID for the current operation.
+     * - Tenant/ School-scoped users: use their own tenant ID
+     * - Platform admins: must specify targetTenantId (e.g. via request DTO)
+     */
+    private UUID resolveTenantId(UUID requestedTenantId) {
+        CustomUserDetails currentUser = getCurrentUserDetails();
+
+        if (currentUser.isPlatformAdmin()) {
+            if (requestedTenantId == null) {
+                throw new BusinessException(MessageKey.INVALID_REQUEST,
+                        "targetTenantId is required for platform admins");
+            }
+            return requestedTenantId;
+        }
+
+        // Tenant-scoped and school-scoped users both belong to a tenant
+        return currentUser.getTenantId();
+    }
+
+
+    private UUID getTenantId() {
+        CustomUserDetails currentUser = getCurrentUserDetails();
+
+        if (currentUser.isPlatformAdmin()) {
+            throw new BusinessException(MessageKey.INVALID_REQUEST,
+                    "Platform admins must specify a target tenant");
+        }
+
+        return currentUser.getTenantId();
+    }
+
+    private CustomUserDetails getCurrentUserDetails() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof CustomUserDetails userDetails) {
+            return userDetails;
+        }
+        throw new BusinessException(MessageKey.AUTH_UNAUTHORIZED);
     }
 }

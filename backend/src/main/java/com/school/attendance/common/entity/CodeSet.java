@@ -24,8 +24,8 @@ public class CodeSet extends BaseAuditableEntity {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name = "school_id", nullable = false)
-    private UUID schoolId;
+    @Column(name = "tenant_id", nullable = false)
+    private UUID tenantId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "code_set_group", nullable = false, length = 50)

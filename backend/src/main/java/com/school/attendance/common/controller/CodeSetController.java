@@ -26,7 +26,7 @@ public class CodeSetController {
     private final MessageResolver messageResolver;
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('CODESET_CREATE')")
     public ResponseEntity<ApiResponse<CodeSetResponse>> createCodeSet(
             @Valid @RequestBody CodeSetRequest request,
             HttpServletRequest httpRequest) {
@@ -44,7 +44,7 @@ public class CodeSetController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_TEACHER', 'TEACHER')")
+    @PreAuthorize("hasAuthority('CODESET_READ')")
     public ResponseEntity<ApiResponse<List<CodeSetResponse>>> getActiveCodeSetsByGroup(
             @RequestParam CodeSetGroup group,
             @RequestParam(defaultValue = "false") boolean includeInactive,
@@ -65,7 +65,7 @@ public class CodeSetController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_TEACHER', 'TEACHER')")
+    @PreAuthorize("hasAuthority('CODESET_READ')")
     public ResponseEntity<ApiResponse<CodeSetResponse>> getCodeSetById(
             @PathVariable UUID id,
             HttpServletRequest httpRequest) {
@@ -83,7 +83,7 @@ public class CodeSetController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('CODESET_UPDATE')")
     public ResponseEntity<ApiResponse<CodeSetResponse>> updateCodeSet(
             @PathVariable UUID id,
             @Valid @RequestBody CodeSetRequest request,
@@ -102,7 +102,7 @@ public class CodeSetController {
     }
 
     @PatchMapping("/{id}/deactivate")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('CODESET_DEACTIVATE')")
     public ResponseEntity<ApiResponse<CodeSetResponse>> deactivateCodeSet(
             @PathVariable UUID id,
             HttpServletRequest httpRequest) {
@@ -120,7 +120,7 @@ public class CodeSetController {
     }
 
     @PatchMapping("/{id}/activate")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('CODESET_ACTIVATE')")
     public ResponseEntity<ApiResponse<CodeSetResponse>> activateCodeSet(
             @PathVariable UUID id,
             HttpServletRequest httpRequest) {

@@ -1,22 +1,29 @@
 package com.school.attendance.user.entity;
 
-import com.school.attendance.user.enums.UserRole;
+import com.school.attendance.common.entity.BaseAuditableEntity;
 import jakarta.persistence.*;
 import lombok.*;
-import java.time.Instant;
+import lombok.experimental.SuperBuilder;
+
 import java.util.UUID;
 
 @Entity
 @Table(name = "app_user")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
-public class AppUser {
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@SuperBuilder
+@EqualsAndHashCode(callSuper = true)
+public class AppUser extends BaseAuditableEntity {
+
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name = "school_id", nullable = false)
-    private UUID schoolId;
+    @Column(name = "tenant_id", nullable = false)
+    private UUID tenantId;
 
     @Column(nullable = false, unique = true, length = 100)
     private String username;
@@ -24,21 +31,14 @@ public class AppUser {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
-    @Column(name = "full_name", nullable = false, length = 255)
+    @Column(name = "full_name", nullable = false)
     private String fullName;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 50)
-    private UserRole role;
+    @Column(name = "role_id", nullable = false)
+    private UUID roleId;
 
+    @Builder.Default
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
-    @Builder.Default
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt = Instant.now();
-
-    @Builder.Default
-    @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt = Instant.now();
 }

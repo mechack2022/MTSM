@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -17,27 +18,16 @@ public class SchoolMapper implements EntityMapper<School, SchoolResponse> {
 
     private final CodeSetRepository codeSetRepository;
 
-    @Override
     public SchoolResponse toDto(School school) {
-        String academicYearDisplayName = Optional.ofNullable(school.getAcademicYearId())
-                .flatMap(codeSetRepository::findById)
-                .map(CodeSet::getDisplayName)
-                .orElse(null);
-
-        String currentTermDisplayName = Optional.ofNullable(school.getCurrentTermId())
-                .flatMap(codeSetRepository::findById)
-                .map(CodeSet::getDisplayName)
-                .orElse(null);
-
         return new SchoolResponse(
                 school.getId(),
                 school.getName(),
                 school.getCode(),
                 school.getAddress(),
                 school.getAcademicYearId(),
-                academicYearDisplayName,
+                resolveDisplayName(school.getAcademicYearId()),
                 school.getCurrentTermId(),
-                currentTermDisplayName,
+                resolveDisplayName(school.getCurrentTermId()),
                 school.getPhone(),
                 school.getEmail(),
                 school.getLogoUrl(),
@@ -46,5 +36,12 @@ public class SchoolMapper implements EntityMapper<School, SchoolResponse> {
                 school.getUpdatedAt(),
                 school.getUpdatedBy()
         );
+    }
+
+    private String resolveDisplayName(UUID codeSetId) {
+        if (codeSetId == null) return null;
+        return codeSetRepository.findById(codeSetId)
+                .map(CodeSet::getDisplayName)
+                .orElse(null);
     }
 }

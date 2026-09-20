@@ -2,8 +2,8 @@ package com.school.attendance.school.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import java.util.UUID;
 
 public record SchoolRequest(
         @NotBlank(message = "School name is required")
@@ -11,14 +11,11 @@ public record SchoolRequest(
         String name,
 
         @NotBlank(message = "School code is required")
-        @Size(max = 50)
+        @Pattern(regexp = "^[A-Z]{3,5}$", message = "School code must be exactly 3 to 5 uppercase letters (e.g., ABC, PILOT)")
         String code,
 
         @Size(max = 500)
         String address,
-
-        UUID academicYearId,
-        UUID currentTermId,
 
         @Size(max = 50)
         String phone,

@@ -6,6 +6,7 @@ import lombok.*;
 import lombok.experimental.SuperBuilder;
 
 import java.util.UUID;
+
 @Entity
 @Table(name = "school")
 @Getter
@@ -20,10 +21,13 @@ public class School extends BaseAuditableEntity {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @Column(name = "tenant_id", nullable = false)
+    private UUID tenantId;
+
     @Column(nullable = false, length = 255)
     private String name;
 
-    @Column(unique = true, nullable = false, length = 50)
+    @Column(name = "code", unique = true, nullable = false, length = 50)
     private String code;
 
     @Column(length = 500)

@@ -1,0 +1,641 @@
+{
+  "info": {
+    "name": "School Attendance - ClassSection API Tests",
+    "description": "Multi-tenant ClassSection API testing collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tenantId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "schoolId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "academicYearId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "gradeLevelId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "classSectionId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "Login as Tenant Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Save access token to environment variable",
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('accessToken', response.data.accessToken);",
+                  "    console.log('✅ Access token saved:', response.data.accessToken.substring(0, 20) + '...');",
+                  "} else {",
+                  "    console.log('❌ Login failed:', pm.response.json());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"Admin@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            },
+            "description": "Login with default seeded tenant admin credentials"
+          },
+          "response": []
+        },
+        {
+          "name": "Login as Platform Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('accessToken', response.data.accessToken);",
+                  "    console.log('✅ Platform admin token saved');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"superadmin\",\n  \"password\": \"Admin@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            },
+            "description": "Login as platform super admin (cross-tenant access)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Prerequisites - Setup Data",
+      "item": [
+        {
+          "name": "Get All Schools",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.data && response.data.length > 0) {",
+                  "        const school = response.data[0];",
+                  "        pm.collectionVariables.set('schoolId', school.id);",
+                  "        pm.collectionVariables.set('tenantId', school.tenantId);",
+                  "        console.log('✅ School ID saved:', school.id);",
+                  "        console.log('✅ Tenant ID saved:', school.tenantId);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/schools",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "schools"]
+            },
+            "description": "Get all schools for the current tenant"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Academic Year (2024)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('academicYearId', response.data.id);",
+                  "    console.log('✅ Academic Year ID saved:', response.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codeSetGroup\": \"ACADEMIC_YEAR\",\n  \"code\": \"2024\",\n  \"displayName\": \"Academic Year 2024\",\n  \"description\": \"School year 2024\",\n  \"sortOrder\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/codesets",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "codesets"]
+            },
+            "description": "Create academic year code set"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Grade Level (Grade 10)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('gradeLevelId', response.data.id);",
+                  "    console.log('✅ Grade Level ID saved:', response.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codeSetGroup\": \"GRADE_LEVEL\",\n  \"code\": \"GRADE_10\",\n  \"displayName\": \"Grade 10\",\n  \"description\": \"Tenth grade level\",\n  \"sortOrder\": 10\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/codesets",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "codesets"]
+            },
+            "description": "Create grade level code set"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Active Academic Years",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/codesets?group=ACADEMIC_YEAR",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "codesets"],
+              "query": [
+                {
+                  "key": "group",
+                  "value": "ACADEMIC_YEAR"
+                }
+              ]
+            },
+            "description": "Get all active academic years for reference"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Active Grade Levels",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/codesets?group=GRADE_LEVEL",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "codesets"],
+              "query": [
+                {
+                  "key": "group",
+                  "value": "GRADE_LEVEL"
+                }
+              ]
+            },
+            "description": "Get all active grade levels for reference"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. ClassSection CRUD",
+      "item": [
+        {
+          "name": "Create Class Section - Grade 10A",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('classSectionId', response.data.id);",
+                  "    console.log('✅ Class Section ID saved:', response.data.id);",
+                  "    console.log('Class:', response.data.name);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schoolId\": \"{{schoolId}}\",\n  \"name\": \"Grade 10A\",\n  \"gradeLevelId\": \"{{gradeLevelId}}\",\n  \"academicYearId\": \"{{academicYearId}}\",\n  \"capacity\": 35\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/classes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "classes"]
+            },
+            "description": "Create a new class section for Grade 10A"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Class Section - Grade 10B",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schoolId\": \"{{schoolId}}\",\n  \"name\": \"Grade 10B\",\n  \"gradeLevelId\": \"{{gradeLevelId}}\",\n  \"academicYearId\": \"{{academicYearId}}\",\n  \"capacity\": 30\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/classes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "classes"]
+            },
+            "description": "Create a second class section for Grade 10B"
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Active Classes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/classes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "classes"]
+            },
+            "description": "Get all active class sections for the tenant"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Classes by School",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/classes?schoolId={{schoolId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "classes"],
+              "query": [
+                {
+                  "key": "schoolId",
+                  "value": "{{schoolId}}"
+                }
+              ]
+            },
+            "description": "Get all classes for a specific school"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Classes by Academic Year",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/classes?academicYearId={{academicYearId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "classes"],
+              "query": [
+                {
+                  "key": "academicYearId",
+                  "value": "{{academicYearId}}"
+                }
+              ]
+            },
+            "description": "Get classes filtered by academic year"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Classes by Grade Level",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/classes?gradeLevelId={{gradeLevelId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "classes"],
+              "query": [
+                {
+                  "key": "gradeLevelId",
+                  "value": "{{gradeLevelId}}"
+                }
+              ]
+            },
+            "description": "Get classes filtered by grade level"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Classes by School + Academic Year",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/classes?schoolId={{schoolId}}&academicYearId={{academicYearId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "classes"],
+              "query": [
+                {
+                  "key": "schoolId",
+                  "value": "{{schoolId}}"
+                },
+                {
+                  "key": "academicYearId",
+                  "value": "{{academicYearId}}"
+                }
+              ]
+            },
+            "description": "Get classes filtered by both school and academic year"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Class Section by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/classes/{{classSectionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "classes", "{{classSectionId}}"]
+            },
+            "description": "Get a specific class section by ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Class Section",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schoolId\": \"{{schoolId}}\",\n  \"name\": \"Grade 10A - Updated\",\n  \"gradeLevelId\": \"{{gradeLevelId}}\",\n  \"academicYearId\": \"{{academicYearId}}\",\n  \"capacity\": 40\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/classes/{{classSectionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "classes", "{{classSectionId}}"]
+            },
+            "description": "Update an existing class section"
+          },
+          "response": []
+        },
+        {
+          "name": "Deactivate Class Section",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/classes/{{classSectionId}}/deactivate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "classes", "{{classSectionId}}", "deactivate"]
+            },
+            "description": "Deactivate a class section (soft delete)"
+          },
+          "response": []
+        },
+        {
+          "name": "Activate Class Section",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/classes/{{classSectionId}}/activate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "classes", "{{classSectionId}}", "activate"]
+            },
+            "description": "Re-activate a previously deactivated class section"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Multi-Tenant Test Scenarios",
+      "item": [
+        {
+          "name": "Attempt Cross-Tenant Access (Should Fail)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/classes/00000000-0000-0000-0000-000000000000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "classes", "00000000-0000-0000-0000-000000000000"]
+            },
+            "description": "Try to access a class section from another tenant (should return 404)"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Class with Invalid School (Should Fail)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schoolId\": \"00000000-0000-0000-0000-000000000000\",\n  \"name\": \"Invalid School Class\",\n  \"gradeLevelId\": \"{{gradeLevelId}}\",\n  \"academicYearId\": \"{{academicYearId}}\",\n  \"capacity\": 30\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/classes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "classes"]
+            },
+            "description": "Try to create a class with a non-existent school ID"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

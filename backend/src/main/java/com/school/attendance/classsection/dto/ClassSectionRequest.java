@@ -8,6 +8,9 @@ import java.util.UUID;
 
 public record ClassSectionRequest(
 
+        @NotNull(message = "School ID is required")
+        UUID schoolId,
+
         @NotBlank(message = "Class name is required")
         @Size(max = 100)
         String name,

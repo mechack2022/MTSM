@@ -5,6 +5,8 @@ import java.util.UUID;
 
 public record ClassSectionResponse(
         UUID id,
+        UUID tenantId,
+        UUID schoolId,
         String name,
         UUID gradeLevelId,
         String gradeLevelDisplayName,

@@ -23,7 +23,7 @@ public class ClassSectionController {
     private final MessageResolver messageResolver;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_TEACHER')")
+    @PreAuthorize("hasAuthority('CLASS_CREATE')")
     public ResponseEntity<ApiResponse<ClassSectionResponse>> createClassSection(
             @Valid @RequestBody ClassSectionRequest request, HttpServletRequest req) {
         return ResponseEntity.status(201).body(
@@ -36,7 +36,7 @@ public class ClassSectionController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_TEACHER', 'TEACHER')")
+    @PreAuthorize("hasAuthority('CLASS_READ')")
     public ResponseEntity<ApiResponse<ClassSectionResponse>> getClassSectionById(
             @PathVariable UUID id, HttpServletRequest req) {
         return ResponseEntity.ok(
@@ -45,7 +45,7 @@ public class ClassSectionController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_TEACHER')")
+    @PreAuthorize("hasAuthority('CLASS_UPDATE')")
     public ResponseEntity<ApiResponse<ClassSectionResponse>> updateClassSection(
             @PathVariable UUID id, @Valid @RequestBody ClassSectionRequest request, HttpServletRequest req) {
         return ResponseEntity.ok(
@@ -54,7 +54,7 @@ public class ClassSectionController {
     }
 
     @PatchMapping("/{id}/deactivate")
-    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_TEACHER')")
+    @PreAuthorize("hasAuthority('CLASS_DEACTIVATE')")
     public ResponseEntity<ApiResponse<ClassSectionResponse>> deactivateClassSection(
             @PathVariable UUID id, HttpServletRequest req) {
         return ResponseEntity.ok(
@@ -63,7 +63,7 @@ public class ClassSectionController {
     }
 
     @PatchMapping("/{id}/activate")
-    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_TEACHER')")
+    @PreAuthorize("hasAuthority('CLASS_DEACTIVATE')")
     public ResponseEntity<ApiResponse<ClassSectionResponse>> activateClassSection(
             @PathVariable UUID id, HttpServletRequest req) {
 
@@ -79,18 +79,19 @@ public class ClassSectionController {
 
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_TEACHER', 'TEACHER')")
+    @PreAuthorize("hasAuthority('CLASS_READ')")
     public ResponseEntity<ApiResponse<List<ClassSectionResponse>>> getAllClasses(
             @RequestParam(required = false) UUID academicYearId,
             @RequestParam(required = false) UUID gradeLevelId,
+            @RequestParam(required = false) UUID schoolId,
             HttpServletRequest req) {
 
         List<ClassSectionResponse> classes;
 
         if (academicYearId != null) {
-            classes = classSectionService.getClassesByAcademicYear(academicYearId);
+            classes = classSectionService.getClassesByAcademicYear(academicYearId, schoolId);
         } else if (gradeLevelId != null) {
-            classes = classSectionService.getClassesByGradeLevel(gradeLevelId);
+            classes = classSectionService.getClassesByGradeLevel(gradeLevelId, schoolId);
         } else {
             classes = classSectionService.getAllActiveClasses();
         }

@@ -6,7 +6,7 @@ credentials.json
 
 # Backend (Java/Maven)
 backend/target/
-backend/.mvn/
+#backend/.mvn/
 backend/out/
 backend/*.jar
 backend/*.war
@@ -16,8 +16,8 @@ backend/.settings/
 backend/.classpath
 backend/.project
 backend/bin/
-backend/mvnw
-backend/mvnw.cmd
+#backend/mvnw
+#backend/mvnw.cmd
 
 # Client (Node)
 client/node_modules/

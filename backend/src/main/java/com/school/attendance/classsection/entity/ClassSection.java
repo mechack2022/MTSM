@@ -21,6 +21,9 @@ public class ClassSection extends BaseAuditableEntity {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @Column(name = "tenant_id", nullable = false)
+    private UUID tenantId;
+
     @Column(name = "school_id", nullable = false)
     private UUID schoolId;
 

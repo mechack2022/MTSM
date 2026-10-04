@@ -41,6 +41,8 @@ public class ClassSectionMapper implements EntityMapper<ClassSection, ClassSecti
 
         return new ClassSectionResponse(
                 classSection.getId(),
+                classSection.getTenantId(),
+                classSection.getSchoolId(),
                 classSection.getName(),
                 classSection.getGradeLevelId(),
                 gradeLevelDisplayName,

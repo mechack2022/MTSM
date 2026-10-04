@@ -10,8 +10,10 @@ import com.school.attendance.common.exception.BusinessException;
 import com.school.attendance.common.service.CodeSetService;
 import com.school.attendance.school.SchoolRepository;
 import com.school.attendance.school.entity.School;
+import com.school.attendance.security.CustomUserDetails;
 import com.school.attendance.user.repository.AppUserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
@@ -29,21 +31,38 @@ public class ClassSectionService {
 
     @Transactional
     public ClassSectionResponse createClassSection(ClassSectionRequest request) {
-        UUID schoolId = getSchoolId();
+        CustomUserDetails currentUser = getCurrentUserDetails();
+        UUID tenantId = getTenantId();
+
+        // Validate and get school
+        School school = schoolRepository.findById(request.schoolId())
+                .orElseThrow(() -> new BusinessException(MessageKey.SCHOOL_NOT_FOUND));
+
+        // Validate school belongs to the current tenant
+        validateSchoolBelongsToTenant(school, tenantId);
+
+        // Validate user has access to this school
+        validateUserHasAccessToSchool(currentUser, school);
+
+        // Validate grade level and academic year belong to tenant
         codeSetService.validateCodeExists(CodeSetGroup.GRADE_LEVEL, request.gradeLevelId());
         codeSetService.validateCodeExists(CodeSetGroup.ACADEMIC_YEAR, request.academicYearId());
-        if (classSectionRepository.existsBySchoolIdAndNameAndAcademicYearId(
-                schoolId, request.name(), request.academicYearId())) {
+
+        // Check for duplicate class section name within the same school and academic year
+        if (classSectionRepository.existsByTenantIdAndSchoolIdAndNameAndAcademicYearId(
+                tenantId, request.schoolId(), request.name(), request.academicYearId())) {
             throw new BusinessException(MessageKey.CLASS_ALREADY_EXISTS);
         }
 
+        // Validate class teacher if provided
         if (request.classTeacherId() != null) {
             userRepository.findById(request.classTeacherId())
                     .orElseThrow(() -> new BusinessException(MessageKey.CLASS_TEACHER_NOT_FOUND));
         }
 
         ClassSection classSection = ClassSection.builder()
-                .schoolId(schoolId)
+                .tenantId(tenantId)
+                .schoolId(request.schoolId())
                 .name(request.name())
                 .gradeLevelId(request.gradeLevelId())
                 .academicYearId(request.academicYearId())
@@ -51,47 +70,110 @@ public class ClassSectionService {
                 .capacity(request.capacity())
                 .isActive(true)
                 .build();
+
         return classSectionMapper.toDto(classSectionRepository.save(classSection));
     }
 
     public List<ClassSectionResponse> getAllActiveClasses() {
-        UUID schoolId = getSchoolId();
-        return classSectionRepository.findBySchoolIdAndIsActiveTrue(schoolId).stream()
+        UUID tenantId = getTenantId();
+        return classSectionRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
                 .map(classSectionMapper::toDto)
                 .toList();
     }
 
-    public List<ClassSectionResponse> getClassesByAcademicYear(UUID academicYearId) {
-        UUID schoolId = getSchoolId();
-        return classSectionRepository.findBySchoolIdAndAcademicYearIdAndIsActiveTrue(schoolId, academicYearId).stream()
-                .map(classSectionMapper::toDto)
-                .toList();
+    public List<ClassSectionResponse> getClassesByAcademicYear(UUID academicYearId, UUID schoolId) {
+        UUID tenantId = getTenantId();
+        CustomUserDetails currentUser = getCurrentUserDetails();
+
+        if (schoolId != null) {
+            // Validate school access
+            School school = schoolRepository.findById(schoolId)
+                    .orElseThrow(() -> new BusinessException(MessageKey.SCHOOL_NOT_FOUND));
+            validateSchoolBelongsToTenant(school, tenantId);
+            validateUserHasAccessToSchool(currentUser, school);
+
+            return classSectionRepository.findByTenantIdAndSchoolIdAndAcademicYearIdAndIsActiveTrue(
+                    tenantId, schoolId, academicYearId).stream()
+                    .map(classSectionMapper::toDto)
+                    .toList();
+        } else {
+            // Return all classes for the tenant (filtered by RLS)
+            return classSectionRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
+                    .filter(cs -> cs.getAcademicYearId().equals(academicYearId))
+                    .map(classSectionMapper::toDto)
+                    .toList();
+        }
     }
 
-    // ✅ New method: filter by grade level
-    public List<ClassSectionResponse> getClassesByGradeLevel(UUID gradeLevelId) {
-        UUID schoolId = getSchoolId();
-        return classSectionRepository.findBySchoolIdAndGradeLevelIdAndIsActiveTrue(schoolId, gradeLevelId).stream()
-                .map(classSectionMapper::toDto)
-                .toList();
+    public List<ClassSectionResponse> getClassesByGradeLevel(UUID gradeLevelId, UUID schoolId) {
+        UUID tenantId = getTenantId();
+        CustomUserDetails currentUser = getCurrentUserDetails();
+
+        if (schoolId != null) {
+            // Validate school access
+            School school = schoolRepository.findById(schoolId)
+                    .orElseThrow(() -> new BusinessException(MessageKey.SCHOOL_NOT_FOUND));
+            validateSchoolBelongsToTenant(school, tenantId);
+            validateUserHasAccessToSchool(currentUser, school);
+
+            return classSectionRepository.findByTenantIdAndSchoolIdAndGradeLevelIdAndIsActiveTrue(
+                    tenantId, schoolId, gradeLevelId).stream()
+                    .map(classSectionMapper::toDto)
+                    .toList();
+        } else {
+            // Return all classes for the tenant (filtered by RLS)
+            return classSectionRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
+                    .filter(cs -> cs.getGradeLevelId().equals(gradeLevelId))
+                    .map(classSectionMapper::toDto)
+                    .toList();
+        }
     }
 
     public ClassSectionResponse getClassSectionById(UUID id) {
-        return classSectionRepository.findById(id)
-                .map(classSectionMapper::toDto)
+        UUID tenantId = getTenantId();
+        CustomUserDetails currentUser = getCurrentUserDetails();
+
+        ClassSection classSection = classSectionRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(MessageKey.CLASS_NOT_FOUND));
+
+        // Validate tenant access
+        if (!classSection.getTenantId().equals(tenantId)) {
+            throw new BusinessException(MessageKey.CLASS_NOT_FOUND);
+        }
+
+        // Validate school access for school-scoped users
+        if (currentUser.isSchoolScoped()) {
+            if (!currentUser.getAssignedSchoolIds().contains(classSection.getSchoolId())) {
+                throw new BusinessException(MessageKey.CLASS_NOT_FOUND);
+            }
+        }
+
+        return classSectionMapper.toDto(classSection);
     }
 
     @Transactional
     public ClassSectionResponse updateClassSection(UUID id, ClassSectionRequest request) {
+        UUID tenantId = getTenantId();
+        CustomUserDetails currentUser = getCurrentUserDetails();
+
         ClassSection classSection = classSectionRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(MessageKey.CLASS_NOT_FOUND));
 
-        // ✅ Validate grade level and academic year
+        // Validate tenant access
+        if (!classSection.getTenantId().equals(tenantId)) {
+            throw new BusinessException(MessageKey.CLASS_NOT_FOUND);
+        }
+
+        // Validate school access
+        School school = schoolRepository.findById(classSection.getSchoolId())
+                .orElseThrow(() -> new BusinessException(MessageKey.SCHOOL_NOT_FOUND));
+        validateUserHasAccessToSchool(currentUser, school);
+
+        // Validate grade level and academic year
         codeSetService.validateCodeExists(CodeSetGroup.GRADE_LEVEL, request.gradeLevelId());
         codeSetService.validateCodeExists(CodeSetGroup.ACADEMIC_YEAR, request.academicYearId());
 
-        // ✅ Validate teacher if provided
+        // Validate teacher if provided
         if (request.classTeacherId() != null) {
             userRepository.findById(request.classTeacherId())
                     .orElseThrow(() -> new BusinessException(MessageKey.CLASS_TEACHER_NOT_FOUND));
@@ -103,15 +185,26 @@ public class ClassSectionService {
         classSection.setClassTeacherId(request.classTeacherId());
         classSection.setCapacity(request.capacity());
 
-        // ✅ No more setUpdatedAt() - JPA auditing handles it!
-
         return classSectionMapper.toDto(classSectionRepository.save(classSection));
     }
 
     @Transactional
     public ClassSectionResponse deactivateClassSection(UUID id) {
+        UUID tenantId = getTenantId();
+        CustomUserDetails currentUser = getCurrentUserDetails();
+
         ClassSection classSection = classSectionRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(MessageKey.CLASS_NOT_FOUND));
+
+        // Validate tenant access
+        if (!classSection.getTenantId().equals(tenantId)) {
+            throw new BusinessException(MessageKey.CLASS_NOT_FOUND);
+        }
+
+        // Validate school access
+        School school = schoolRepository.findById(classSection.getSchoolId())
+                .orElseThrow(() -> new BusinessException(MessageKey.SCHOOL_NOT_FOUND));
+        validateUserHasAccessToSchool(currentUser, school);
 
         if (!classSection.getIsActive()) {
             throw new BusinessException(MessageKey.CLASS_ALREADY_DEACTIVATED);
@@ -123,8 +216,21 @@ public class ClassSectionService {
 
     @Transactional
     public ClassSectionResponse activateClassSection(UUID id) {
+        UUID tenantId = getTenantId();
+        CustomUserDetails currentUser = getCurrentUserDetails();
+
         ClassSection classSection = classSectionRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(MessageKey.CLASS_NOT_FOUND));
+
+        // Validate tenant access
+        if (!classSection.getTenantId().equals(tenantId)) {
+            throw new BusinessException(MessageKey.CLASS_NOT_FOUND);
+        }
+
+        // Validate school access
+        School school = schoolRepository.findById(classSection.getSchoolId())
+                .orElseThrow(() -> new BusinessException(MessageKey.SCHOOL_NOT_FOUND));
+        validateUserHasAccessToSchool(currentUser, school);
 
         if (classSection.getIsActive()) {
             throw new BusinessException(MessageKey.CLASS_ALREADY_ACTIVE);
@@ -134,9 +240,45 @@ public class ClassSectionService {
         return classSectionMapper.toDto(classSectionRepository.save(classSection));
     }
 
-    private UUID getSchoolId() {
-        return schoolRepository.findFirstByOrderByIdAsc()
-                .map(School::getId)
-                .orElseThrow(() -> new BusinessException(MessageKey.INTERNAL_ERROR));
+    // ══════════════════════════════════════════════════════════════
+    // TENANT CONTEXT & AUTHORIZATION HELPERS
+    // ══════════════════════════════════════════════════════════════
+
+    private CustomUserDetails getCurrentUserDetails() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof CustomUserDetails userDetails) {
+            return userDetails;
+        }
+        throw new BusinessException(MessageKey.AUTH_UNAUTHORIZED);
+    }
+
+    private UUID getTenantId() {
+        CustomUserDetails currentUser = getCurrentUserDetails();
+        if (currentUser.isPlatformAdmin()) {
+            throw new BusinessException(MessageKey.INVALID_REQUEST,
+                    "Platform admins must operate within a tenant context");
+        }
+        return currentUser.getTenantId();
+    }
+
+    private void validateSchoolBelongsToTenant(School school, UUID tenantId) {
+        if (!school.getTenantId().equals(tenantId)) {
+            throw new BusinessException(MessageKey.SCHOOL_NOT_FOUND);
+        }
+    }
+
+    private void validateUserHasAccessToSchool(CustomUserDetails currentUser, School school) {
+        if (currentUser.isPlatformAdmin()) {
+            return; // Platform admins have access to all schools
+        }
+
+        if (currentUser.isTenantScoped()) {
+            return; // Tenant-scoped users have access to all schools in their tenant
+        }
+
+        // School-scoped users must have explicit access
+        if (!currentUser.getAssignedSchoolIds().contains(school.getId())) {
+            throw new BusinessException(MessageKey.UNAUTHORIZED_SCHOOL_ACCESS);
+        }
     }
 }

@@ -1,3 +1,5 @@
 databaseChangeLog:
   - include:
       file: db/changelog/changes/001-schema.xml
+  - include:
+      file: db/changelog/changes/002-add-tenant-id-to-class-section.xml

@@ -6,10 +6,16 @@ import java.util.List;
 import java.util.UUID;
 
 public interface ClassSectionRepository extends JpaRepository<ClassSection, UUID> {
-    List<ClassSection> findBySchoolIdAndAcademicYearIdAndIsActiveTrue(UUID schoolId, UUID academicYearId);
-    List<ClassSection> findBySchoolIdAndGradeLevelIdAndIsActiveTrue(UUID schoolId, UUID gradeLevelId);
-    List<ClassSection> findBySchoolIdAndIsActiveTrue(UUID schoolId);
-    boolean existsBySchoolIdAndNameAndAcademicYearId(UUID schoolId, String name, UUID academicYearId);
-    List<ClassSection> findByClassTeacherIdAndIsActiveTrue(UUID classTeacherId);
+    // Multi-tenant queries - filter by both tenantId and schoolId
+    List<ClassSection> findByTenantIdAndSchoolIdAndAcademicYearIdAndIsActiveTrue(
+            UUID tenantId, UUID schoolId, UUID academicYearId);
+    List<ClassSection> findByTenantIdAndSchoolIdAndGradeLevelIdAndIsActiveTrue(
+            UUID tenantId, UUID schoolId, UUID gradeLevelId);
+    List<ClassSection> findByTenantIdAndSchoolIdAndIsActiveTrue(UUID tenantId, UUID schoolId);
+    boolean existsByTenantIdAndSchoolIdAndNameAndAcademicYearId(
+            UUID tenantId, UUID schoolId, String name, UUID academicYearId);
 
+    // Tenant-wide queries
+    List<ClassSection> findByTenantIdAndIsActiveTrue(UUID tenantId);
+    List<ClassSection> findByTenantIdAndClassTeacherIdAndIsActiveTrue(UUID tenantId, UUID classTeacherId);
 }

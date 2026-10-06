@@ -25,6 +25,7 @@ public class LearnerMapper implements EntityMapper<Learner, LearnerResponse> {
 
         return new LearnerResponse(
                 learner.getId(),
+                learner.getTenantId(),
                 learner.getSchoolId(),
                 learner.getFirstName(),
                 learner.getLastName(),

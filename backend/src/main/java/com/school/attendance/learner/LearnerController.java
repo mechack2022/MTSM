@@ -25,7 +25,7 @@ public class LearnerController {
     private final MessageResolver messageResolver;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_TEACHER')")
+    @PreAuthorize("hasAuthority('LEARNER_CREATE')")
     public ResponseEntity<ApiResponse<LearnerResponse>> createLearner(
             @Valid @RequestBody CreateLearnerRequest request, HttpServletRequest req) {
         return ResponseEntity.status(201).body(
@@ -35,12 +35,14 @@ public class LearnerController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_TEACHER', 'TEACHER')")
+    @PreAuthorize("hasAuthority('LEARNER_READ')")
     public ResponseEntity<ApiResponse<List<LearnerResponse>>> getAllLearners(
-            @RequestParam(required = false) UUID gradeLevelId, HttpServletRequest req) {
+            @RequestParam(required = false) UUID gradeLevelId,
+            @RequestParam(required = false) UUID schoolId,
+            HttpServletRequest req) {
 
         List<LearnerResponse> learners = (gradeLevelId != null)
-                ? learnerService.getLearnersByGradeLevel(gradeLevelId)
+                ? learnerService.getLearnersByGradeLevel(gradeLevelId, schoolId)
                 : learnerService.getAllActiveLearners();
 
         return ResponseEntity.ok(
@@ -50,7 +52,7 @@ public class LearnerController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_TEACHER', 'TEACHER')")
+    @PreAuthorize("hasAuthority('LEARNER_READ')")
     public ResponseEntity<ApiResponse<LearnerResponse>> getLearnerById(
             @PathVariable UUID id, HttpServletRequest req) {
         return ResponseEntity.ok(
@@ -60,7 +62,7 @@ public class LearnerController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_TEACHER')")
+    @PreAuthorize("hasAuthority('LEARNER_UPDATE')")
     public ResponseEntity<ApiResponse<LearnerResponse>> updateLearner(
             @PathVariable UUID id, @Valid @RequestBody UpdateLearnerRequest request, HttpServletRequest req) {
         return ResponseEntity.ok(
@@ -70,7 +72,7 @@ public class LearnerController {
     }
 
     @PatchMapping("/{id}/deactivate")
-    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_TEACHER')")
+    @PreAuthorize("hasAuthority('LEARNER_DEACTIVATE')")
     public ResponseEntity<ApiResponse<LearnerResponse>> deactivateLearner(
             @PathVariable UUID id, HttpServletRequest req) {
         return ResponseEntity.ok(
@@ -80,7 +82,7 @@ public class LearnerController {
     }
 
     @PatchMapping("/{id}/activate")
-    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_TEACHER')")
+    @PreAuthorize("hasAuthority('LEARNER_DEACTIVATE')")
     public ResponseEntity<ApiResponse<LearnerResponse>> activateLearner(
             @PathVariable UUID id, HttpServletRequest req) {
         return ResponseEntity.ok(

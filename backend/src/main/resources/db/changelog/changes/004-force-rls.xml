@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- ===================================================================== -->
+    <!-- 004: Force Row-Level Security for all users including superusers     -->
+    <!-- ===================================================================== -->
+    <!-- PostgreSQL RLS doesn't apply to table owners and superusers by       -->
+    <!-- default. FORCE ROW LEVEL SECURITY ensures policies apply to          -->
+    <!-- everyone, which is critical for multi-tenant security in tests.      -->
+    <!-- ===================================================================== -->
+
+    <changeSet id="004-01-force-rls-on-all-tables" author="system">
+        <comment>Apply FORCE ROW LEVEL SECURITY to ensure RLS policies apply even to superusers and table owners.
+            This is essential for testing with Testcontainers where the database user is a superuser.</comment>
+        <sql>
+            ALTER TABLE tenant FORCE ROW LEVEL SECURITY;
+            ALTER TABLE school FORCE ROW LEVEL SECURITY;
+            ALTER TABLE code_set FORCE ROW LEVEL SECURITY;
+            ALTER TABLE app_user_school FORCE ROW LEVEL SECURITY;
+            ALTER TABLE learner FORCE ROW LEVEL SECURITY;
+            ALTER TABLE class_section FORCE ROW LEVEL SECURITY;
+            ALTER TABLE enrollment FORCE ROW LEVEL SECURITY;
+            ALTER TABLE attendance FORCE ROW LEVEL SECURITY;
+            ALTER TABLE change_log FORCE ROW LEVEL SECURITY;
+            ALTER TABLE sync_conflict FORCE ROW LEVEL SECURITY;
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

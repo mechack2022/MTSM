@@ -41,6 +41,7 @@ public class SecurityConfig {
     private final JwtService jwtService;
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
+    private final RowLevelSecurityFilter rowLevelSecurityFilter;
 
     // ✅ 1. Build CustomUserDetailsService as a Bean
     @Bean
@@ -99,7 +100,8 @@ public class SecurityConfig {
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(rowLevelSecurityFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }

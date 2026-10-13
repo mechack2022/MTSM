@@ -30,7 +30,21 @@ export interface Tenant {
   contactPhone: string | null
   isActive: boolean
   createdAt: string
+  createdBy: string | null
   updatedAt: string
+  updatedBy: string | null
+}
+
+export interface CreateTenantRequest {
+  name: string
+  contactEmail?: string | null
+  contactPhone?: string | null
+}
+
+export interface UpdateTenantRequest {
+  name: string
+  contactEmail?: string | null
+  contactPhone?: string | null
 }
 
 export interface School {

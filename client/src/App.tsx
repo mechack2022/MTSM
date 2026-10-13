@@ -25,6 +25,7 @@ import { useAuth } from '@/store'
 // These will be created in the next steps
 import LoginPage from '@/pages/login'
 import DashboardPage from '@/pages/dashboard'
+import TenantsPage from '@/pages/tenants'
 import AttendancePage from '@/pages/attendance'
 import LearnersPage from '@/pages/learners'
 import ClassesPage from '@/pages/classes'
@@ -114,6 +115,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/tenants"
+        element={
+          <ProtectedRoute>
+            <TenantsPage />
           </ProtectedRoute>
         }
       />

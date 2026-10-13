@@ -5,6 +5,9 @@
 // Authentication
 export * from './use-auth'
 
+// Tenants
+export * from './use-tenants'
+
 // Schools
 export * from './use-schools'
 

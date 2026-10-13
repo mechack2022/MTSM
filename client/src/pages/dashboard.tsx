@@ -61,6 +61,14 @@ export default function DashboardPage() {
               >
                 Dashboard
               </Link>
+              {user?.isPlatformAdmin && (
+                <Link
+                  to="/tenants"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  Tenants
+                </Link>
+              )}
               <Link
                 to="/attendance"
                 className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"

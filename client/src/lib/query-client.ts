@@ -130,6 +130,12 @@ export const queryKeys = {
     current: ['auth', 'current'] as const,
   },
 
+  // Tenants
+  tenants: {
+    all: ['tenants'] as const,
+    detail: (id: string) => ['tenants', id] as const,
+  },
+
   // Schools
   schools: {
     all: ['schools'] as const,

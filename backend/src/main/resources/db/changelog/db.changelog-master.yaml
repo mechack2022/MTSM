@@ -9,3 +9,5 @@ databaseChangeLog:
       file: db/changelog/changes/004-force-rls.xml
   - include:
       file: db/changelog/changes/005-fix-learner-rls-policy.xml
+  - include:
+      file: db/changelog/changes/006-add-tenant-id-to-enrollment.xml

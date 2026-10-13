@@ -1,6 +1,6 @@
-//package com.school.attendance.enrollment;
-//
-//import com.school.attendance.attendance.BaseIntegrationTest;
+package com.school.attendance.enrollment;
+
+import com.school.attendance.attendance.BaseIntegrationTest;
 //import com.school.attendance.classsection.entity.ClassSection;
 //import com.school.attendance.common.entity.CodeSet;
 //import com.school.attendance.common.enums.CodeSetGroup;

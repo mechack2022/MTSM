@@ -48,7 +48,7 @@ spring:
           starttls:
             enable: false
             required: false
-        debug: true
+        debug: false
     default-encoding: UTF-8
 
   servlet:

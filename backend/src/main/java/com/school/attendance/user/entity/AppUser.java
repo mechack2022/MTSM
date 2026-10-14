@@ -34,6 +34,9 @@ public class AppUser extends BaseAuditableEntity {
     @Column(name = "full_name", nullable = false)
     private String fullName;
 
+    @Column(name = "email", unique = true, length = 255)
+    private String email;
+
     @Column(name = "role_id", nullable = false)
     private UUID roleId;
 

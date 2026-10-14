@@ -210,13 +210,21 @@ export default function LandingPage() {
               </span>
             </div>
 
-            {/* Login Button */}
-            <button
-              onClick={() => navigate('/login')}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-medium shadow-sm hover:shadow-lg hover:scale-105 animate-slide-in-right"
-            >
-              Login
-            </button>
+            {/* Auth Buttons */}
+            <div className="flex items-center gap-3 animate-slide-in-right">
+              <button
+                onClick={() => navigate('/signup')}
+                className="px-6 py-2 border-2 border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-all font-medium hover:scale-105"
+              >
+                Sign Up
+              </button>
+              <button
+                onClick={() => navigate('/login')}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-medium shadow-sm hover:shadow-lg hover:scale-105"
+              >
+                Login
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -248,7 +256,7 @@ export default function LandingPage() {
           </div>
           <div className="flex gap-4 justify-center animate-fade-in-up stagger-4">
             <button
-              onClick={() => navigate('/login')}
+              onClick={() => navigate('/signup')}
               className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-semibold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 hover:scale-105"
             >
               Get Started

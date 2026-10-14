@@ -25,6 +25,9 @@ import { useAuth } from '@/store'
 // These will be created in the next steps
 import LandingPage from '@/pages/landing'
 import LoginPage from '@/pages/login'
+import SignupPage from '@/pages/signup'
+import VerifyEmailPage from '@/pages/verify-email'
+import ResendVerificationPage from '@/pages/resend-verification'
 import DashboardPage from '@/pages/dashboard'
 import TenantsPage from '@/pages/tenants'
 import CodeSetsPage from '@/pages/code-sets'
@@ -115,6 +118,9 @@ function AppRoutes() {
       {/* Public Routes */}
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/signup" element={<SignupPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/resend-verification" element={<ResendVerificationPage />} />
 
       {/* Protected Routes */}
       <Route

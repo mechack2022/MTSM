@@ -235,6 +235,34 @@ export interface LoginResponse {
   role: string
 }
 
+export interface SignupRequest {
+  organizationName: string
+  organizationCode: string
+  fullName: string
+  email: string
+  username: string
+  password: string
+  contactEmail?: string
+  contactPhone?: string
+}
+
+export interface SignupResponse {
+  userId: string
+  tenantId: string
+  email: string
+  message: string
+}
+
+export interface VerifyEmailResponse {
+  success: boolean
+  message: string
+  username: string
+}
+
+export interface ResendVerificationRequest {
+  email: string
+}
+
 export interface CreateLearnerRequest {
   schoolId: string
   firstName: string

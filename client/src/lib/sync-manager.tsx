@@ -236,37 +236,101 @@ export function useSyncManager() {
 export function NetworkStatusIndicator() {
   const { isOnline, pendingSyncCount } = useSyncManager()
 
-  if (isOnline && pendingSyncCount === 0) {
-    return null // Don't show indicator when online and no pending changes
-  }
-
+  // Always show the indicator to inform users about offline-first capabilities
   return (
     <div
       className={`
         fixed bottom-4 right-4 z-50
-        px-4 py-2 rounded-lg shadow-lg
-        flex items-center gap-2
-        ${isOnline ? 'bg-green-500' : 'bg-red-500'}
-        text-white text-sm font-medium
+        px-5 py-3 rounded-xl shadow-2xl border-2
+        flex items-center gap-3
+        transition-all duration-300 hover:scale-105
+        ${
+          isOnline
+            ? pendingSyncCount > 0
+              ? 'bg-gradient-to-r from-emerald-500 to-teal-500 border-emerald-400'
+              : 'bg-gradient-to-r from-blue-500 to-indigo-500 border-blue-400'
+            : 'bg-gradient-to-r from-orange-500 to-red-500 border-orange-400'
+        }
+        text-white font-medium backdrop-blur-sm
       `}
     >
-      <div
-        className={`
-          w-2 h-2 rounded-full
-          ${isOnline ? 'bg-white animate-pulse' : 'bg-white'}
-        `}
-      />
-      <span>
+      {/* Status Icon */}
+      <div className="relative flex items-center justify-center">
         {isOnline ? (
           pendingSyncCount > 0 ? (
-            `Syncing ${pendingSyncCount} changes...`
+            <svg
+              className="w-5 h-5 animate-spin"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
           ) : (
-            'Online'
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+              />
+            </svg>
           )
         ) : (
-          `Offline - ${pendingSyncCount} changes pending`
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414"
+            />
+          </svg>
         )}
-      </span>
+        <div
+          className={`
+            absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-white
+            ${isOnline ? 'animate-pulse' : ''}
+          `}
+        />
+      </div>
+
+      {/* Status Text */}
+      <div className="flex flex-col">
+        <span className="text-sm font-bold leading-tight">
+          {isOnline ? (
+            pendingSyncCount > 0 ? (
+              `Syncing ${pendingSyncCount} change${pendingSyncCount !== 1 ? 's' : ''}...`
+            ) : (
+              'Online & Synced'
+            )
+          ) : (
+            'Working Offline'
+          )}
+        </span>
+        <span className="text-xs opacity-90 leading-tight">
+          {isOnline ? (
+            pendingSyncCount > 0 ? (
+              'Auto-syncing to cloud'
+            ) : (
+              'Offline-first ready'
+            )
+          ) : pendingSyncCount > 0 ? (
+            `${pendingSyncCount} pending sync`
+          ) : (
+            'Changes saved locally'
+          )}
+        </span>
+      </div>
+
+      {/* Pulse animation for offline mode */}
+      {!isOnline && (
+        <div className="absolute inset-0 rounded-xl border-2 border-white opacity-75 animate-ping" />
+      )}
     </div>
   )
 }

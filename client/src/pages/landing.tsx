@@ -228,12 +228,25 @@ export default function LandingPage() {
             Complete School Management
             <span className="block text-blue-600 mt-2 animate-fade-in-up stagger-1">All in One Platform</span>
           </h1>
-          <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto animate-fade-in-up stagger-2">
+          <p className="text-xl text-gray-600 mb-6 max-w-3xl mx-auto animate-fade-in-up stagger-2">
             A comprehensive, cloud-based School Information System (SIS) for managing
             students, staff, academics, attendance, fees, and more. Built for modern
             educational institutions of all sizes.
           </p>
-          <div className="flex gap-4 justify-center animate-fade-in-up stagger-3">
+
+          {/* Offline-First Badge */}
+          <div className="flex justify-center mb-8 animate-fade-in-up stagger-3">
+            <div className="inline-flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-full shadow-lg hover:shadow-xl transform hover:scale-105 transition-all">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+              <span className="font-semibold text-lg">Offline-First Design</span>
+              <svg className="w-5 h-5 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+            </div>
+          </div>
+          <div className="flex gap-4 justify-center animate-fade-in-up stagger-4">
             <button
               onClick={() => navigate('/login')}
               className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-semibold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 hover:scale-105"
@@ -252,30 +265,30 @@ export default function LandingPage() {
         </div>
 
         {/* Hero Illustration */}
-        <div className="mt-16 bg-white rounded-2xl shadow-2xl p-8 border border-gray-200 animate-scale-in stagger-4">
+        <div className="mt-16 bg-white rounded-2xl shadow-2xl p-8 border border-gray-200 animate-scale-in stagger-5">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="text-center p-6 bg-blue-50 rounded-xl transition-all hover:shadow-lg hover:-translate-y-2 animate-fade-in-up stagger-4 cursor-pointer">
+            <div className="text-center p-6 bg-blue-50 rounded-xl transition-all hover:shadow-lg hover:-translate-y-2 animate-fade-in-up stagger-5 cursor-pointer">
               <div className="text-4xl mb-3 animate-float">👨‍🎓</div>
               <h3 className="font-semibold text-gray-900 mb-2">Student Management</h3>
               <p className="text-sm text-gray-600">
                 Complete student profiles, enrollment & records
               </p>
             </div>
-            <div className="text-center p-6 bg-green-50 rounded-xl transition-all hover:shadow-lg hover:-translate-y-2 animate-fade-in-up stagger-5 cursor-pointer">
+            <div className="text-center p-6 bg-green-50 rounded-xl transition-all hover:shadow-lg hover:-translate-y-2 animate-fade-in-up stagger-6 cursor-pointer">
               <div className="text-4xl mb-3 animate-float" style={{ animationDelay: '0.5s' }}>📚</div>
               <h3 className="font-semibold text-gray-900 mb-2">Academic Tracking</h3>
               <p className="text-sm text-gray-600">
                 Grades, exams, assessments & report cards
               </p>
             </div>
-            <div className="text-center p-6 bg-purple-50 rounded-xl transition-all hover:shadow-lg hover:-translate-y-2 animate-fade-in-up stagger-6 cursor-pointer">
+            <div className="text-center p-6 bg-purple-50 rounded-xl transition-all hover:shadow-lg hover:-translate-y-2 animate-fade-in-up stagger-7 cursor-pointer">
               <div className="text-4xl mb-3 animate-float" style={{ animationDelay: '1s' }}>💰</div>
               <h3 className="font-semibold text-gray-900 mb-2">Fee Management</h3>
               <p className="text-sm text-gray-600">
                 Billing, payments, invoices & receipts
               </p>
             </div>
-            <div className="text-center p-6 bg-orange-50 rounded-xl transition-all hover:shadow-lg hover:-translate-y-2 animate-fade-in-up stagger-7 cursor-pointer">
+            <div className="text-center p-6 bg-orange-50 rounded-xl transition-all hover:shadow-lg hover:-translate-y-2 animate-fade-in-up stagger-8 cursor-pointer">
               <div className="text-4xl mb-3 animate-float" style={{ animationDelay: '1.5s' }}>📊</div>
               <h3 className="font-semibold text-gray-900 mb-2">Analytics & Reports</h3>
               <p className="text-sm text-gray-600">
@@ -432,6 +445,55 @@ export default function LandingPage() {
               <p className="text-gray-600">
                 Comprehensive reports across all modules with data visualization, custom filters, and export capabilities.
               </p>
+            </div>
+          </div>
+
+          {/* Offline-First Highlight Section */}
+          <div className="mt-16 bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 rounded-2xl p-8 border-2 border-emerald-200 shadow-xl">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex flex-col md:flex-row items-center gap-8">
+                <div className="flex-shrink-0">
+                  <div className="w-24 h-24 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl flex items-center justify-center shadow-lg transform hover:rotate-6 transition-transform">
+                    <svg className="w-14 h-14 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="flex-1 text-center md:text-left">
+                  <h3 className="text-3xl font-bold text-gray-900 mb-3">
+                    Built Offline-First
+                  </h3>
+                  <p className="text-lg text-gray-700 mb-4">
+                    Work seamlessly even without internet connectivity. All data is cached locally and automatically synchronized when you're back online.
+                  </p>
+                  <div className="flex flex-wrap gap-3 justify-center md:justify-start">
+                    <span className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-lg shadow-sm border border-emerald-200">
+                      <svg className="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-sm font-medium text-gray-700">Local Data Storage</span>
+                    </span>
+                    <span className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-lg shadow-sm border border-emerald-200">
+                      <svg className="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-sm font-medium text-gray-700">Auto-Sync</span>
+                    </span>
+                    <span className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-lg shadow-sm border border-emerald-200">
+                      <svg className="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-sm font-medium text-gray-700">Conflict Resolution</span>
+                    </span>
+                    <span className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-lg shadow-sm border border-emerald-200">
+                      <svg className="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-sm font-medium text-gray-700">Uninterrupted Workflow</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

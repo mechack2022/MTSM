@@ -60,6 +60,10 @@ public abstract class BaseIntegrationTest {
 
         registry.add("SEED_ADMIN_PASSWORD", () -> "TestPassword123!");
         registry.add("SEED_TENANT_ADMIN_PASSWORD", () -> "TestPassword123!");
+
+        // Ensure Liquibase runs in tests
+        registry.add("spring.liquibase.enabled", () -> "true");
+        registry.add("spring.liquibase.change-log", () -> "classpath:db/changelog/db.changelog-master.yaml");
     }
 
     @Autowired protected MockMvc mockMvc;

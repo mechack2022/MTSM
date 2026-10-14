@@ -3,3 +3,11 @@ databaseChangeLog:
       file: db/changelog/changes/001-schema.xml
   - include:
       file: db/changelog/changes/002-add-tenant-id-to-class-section.xml
+  - include:
+      file: db/changelog/changes/003-add-tenant-id-to-learner.xml
+  - include:
+      file: db/changelog/changes/004-force-rls.xml
+  - include:
+      file: db/changelog/changes/005-fix-learner-rls-policy.xml
+  - include:
+      file: db/changelog/changes/006-add-tenant-id-to-enrollment.xml

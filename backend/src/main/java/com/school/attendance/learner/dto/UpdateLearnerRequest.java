@@ -8,6 +8,9 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 public record UpdateLearnerRequest(
+        @NotNull(message = "School ID is required")
+        UUID schoolId,
+
         @NotBlank(message = "First name is required")
         @Size(max = 100)
         String firstName,

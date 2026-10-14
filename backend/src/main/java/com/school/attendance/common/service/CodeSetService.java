@@ -51,7 +51,25 @@ public class CodeSetService {
     }
 
     public List<CodeSetResponse> getActiveCodeSetsByGroup(CodeSetGroup group) {
-        UUID tenantId = getTenantId();
+        return getActiveCodeSetsByGroup(group, null);
+    }
+
+    public List<CodeSetResponse> getActiveCodeSetsByGroup(CodeSetGroup group, UUID targetTenantId) {
+        CustomUserDetails currentUser = getCurrentUserDetails();
+
+        // Resolve which tenant to query
+        UUID tenantId;
+        if (targetTenantId != null && currentUser.isPlatformAdmin()) {
+            // Platform admin querying specific tenant
+            tenantId = targetTenantId;
+        } else if (currentUser.isPlatformAdmin()) {
+            // Platform admin without tenant context - return empty list
+            return List.of();
+        } else {
+            // Regular users use their own tenant
+            tenantId = currentUser.getTenantId();
+        }
+
         return codeSetRepository
                 .findByTenantIdAndCodeSetGroupAndIsActiveTrueOrderBySortOrderAsc(tenantId, group)
                 .stream()
@@ -64,7 +82,25 @@ public class CodeSetService {
      * Useful for admin management screens.
      */
     public List<CodeSetResponse> getAllCodeSetsByGroup(CodeSetGroup group) {
-        UUID tenantId = getTenantId();
+        return getAllCodeSetsByGroup(group, null);
+    }
+
+    public List<CodeSetResponse> getAllCodeSetsByGroup(CodeSetGroup group, UUID targetTenantId) {
+        CustomUserDetails currentUser = getCurrentUserDetails();
+
+        // Resolve which tenant to query
+        UUID tenantId;
+        if (targetTenantId != null && currentUser.isPlatformAdmin()) {
+            // Platform admin querying specific tenant
+            tenantId = targetTenantId;
+        } else if (currentUser.isPlatformAdmin()) {
+            // Platform admin without tenant context - return empty list
+            return List.of();
+        } else {
+            // Regular users use their own tenant
+            tenantId = currentUser.getTenantId();
+        }
+
         return codeSetRepository
                 .findByTenantIdAndCodeSetGroupOrderBySortOrderAsc(tenantId, group)
                 .stream()

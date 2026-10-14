@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- ===================================================================== -->
+    <!-- 006: Add tenant_id to enrollment for multi-tenancy support           -->
+    <!-- ===================================================================== -->
+
+    <changeSet id="006-01-add-tenant-id-to-enrollment" author="system">
+        <comment>Add tenant_id column to enrollment table for multi-tenant support</comment>
+
+        <!-- Step 1: Add the column as nullable first -->
+        <addColumn tableName="enrollment">
+            <column name="tenant_id" type="uuid"/>
+        </addColumn>
+
+        <!-- Step 2: Populate tenant_id from school table -->
+        <sql>
+            UPDATE enrollment e
+            SET tenant_id = s.tenant_id
+            FROM school s
+            WHERE e.school_id = s.id;
+        </sql>
+
+        <!-- Step 3: Make tenant_id NOT NULL -->
+        <addNotNullConstraint tableName="enrollment" columnName="tenant_id"/>
+
+        <!-- Step 4: Add foreign key constraint -->
+        <addForeignKeyConstraint
+            baseTableName="enrollment"
+            baseColumnNames="tenant_id"
+            referencedTableName="tenant"
+            referencedColumnNames="id"
+            constraintName="fk_enrollment_tenant"
+            onDelete="CASCADE"/>
+
+        <!-- Step 5: Add index for performance -->
+        <createIndex tableName="enrollment" indexName="idx_enrollment_tenant">
+            <column name="tenant_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="006-02-update-enrollment-rls" author="system">
+        <comment>Update RLS policy for enrollment to include direct tenant_id check</comment>
+
+        <!-- Drop the existing policy -->
+        <sql>
+            DROP POLICY IF EXISTS enrollment_isolation ON enrollment;
+        </sql>
+
+        <!-- Create updated policy with tenant_id check -->
+        <sql>
+            CREATE POLICY enrollment_isolation ON enrollment
+            USING (
+                current_setting('app.is_platform_admin', true) = 'true'
+                OR tenant_id::text = current_setting('app.current_tenant_id', true)
+                OR school_id IN (
+                    SELECT school_id FROM app_user_school
+                    WHERE app_user_id::text = current_setting('app.current_user_id', true)
+                )
+            );
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

@@ -11,11 +11,17 @@ import java.util.UUID;
 @Repository
 public interface LearnerRepository extends JpaRepository<Learner, UUID> {
 
-   boolean existsBySchoolIdAndLearnerNumber(UUID schoolId, String learnerNumber);
-    Optional<Learner> findBySchoolIdAndLearnerNumber(UUID schoolId, String studentNumber);
+    // Tenant-aware queries
+    Optional<Learner> findByIdAndTenantId(UUID id, UUID tenantId);
 
-    List<Learner> findBySchoolIdAndIsActiveTrueOrderByLastNameAscFirstNameAsc(UUID schoolId);
+    boolean existsByTenantIdAndSchoolIdAndLearnerNumber(UUID tenantId, UUID schoolId, String learnerNumber);
 
-    List<Learner> findBySchoolIdAndGradeLevelIdAndIsActiveTrue(UUID schoolId, UUID gradeLevelId);
+    Optional<Learner> findByTenantIdAndSchoolIdAndLearnerNumber(UUID tenantId, UUID schoolId, String learnerNumber);
+
+    List<Learner> findByTenantIdAndSchoolIdAndIsActiveTrueOrderByLastNameAscFirstNameAsc(UUID tenantId, UUID schoolId);
+
+    List<Learner> findByTenantIdAndSchoolIdAndGradeLevelIdAndIsActiveTrue(UUID tenantId, UUID schoolId, UUID gradeLevelId);
+
+    List<Learner> findByTenantIdAndIsActiveTrueOrderByLastNameAscFirstNameAsc(UUID tenantId);
 
 }

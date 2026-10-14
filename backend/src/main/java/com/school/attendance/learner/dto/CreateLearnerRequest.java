@@ -8,6 +8,9 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 public record CreateLearnerRequest(
+        @NotNull(message = "School ID is required")
+        UUID schoolId,
+
         @NotBlank(message = "First name is required")
         @Size(max = 100, message = "First name must be 100 characters or less")
         String firstName,

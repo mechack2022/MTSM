@@ -1,0 +1,279 @@
+{
+	"info": {
+		"name": "Learner API",
+		"description": "Collection for testing School Attendance Learner endpoints",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "schoolId",
+			"value": "123e4567-e89b-12d3-a456-426614174000",
+			"type": "string"
+		},
+		{
+			"key": "gradeLevelId",
+			"value": "223e4567-e89b-12d3-a456-426614174000",
+			"type": "string"
+		},
+		{
+			"key": "learnerId",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Create Learner",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"if (pm.response.code === 201) {",
+							"    const jsonData = pm.response.json();",
+							"    if (jsonData.data && jsonData.data.id) {",
+							"        pm.collectionVariables.set('learnerId', jsonData.data.id);",
+							"        console.log('Learner ID saved: ' + jsonData.data.id);",
+							"    }",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"schoolId\": \"{{schoolId}}\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"learnerNumber\": \"LRN2024001\",\n  \"gradeLevelId\": \"{{gradeLevelId}}\",\n  \"dateOfBirth\": \"2010-05-15\",\n  \"sex\": \"Male\",\n  \"previousSchoolName\": \"Springfield Elementary\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/learners",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "learners"]
+				},
+				"description": "Create a new learner with all fields"
+			},
+			"response": []
+		},
+		{
+			"name": "Create Learner - Minimal Fields",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"if (pm.response.code === 201) {",
+							"    const jsonData = pm.response.json();",
+							"    if (jsonData.data && jsonData.data.id) {",
+							"        pm.collectionVariables.set('learnerId', jsonData.data.id);",
+							"    }",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"schoolId\": \"{{schoolId}}\",\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Smith\",\n  \"gradeLevelId\": \"{{gradeLevelId}}\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/learners",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "learners"]
+				},
+				"description": "Create a learner with only required fields"
+			},
+			"response": []
+		},
+		{
+			"name": "Get All Learners",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/learners",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "learners"]
+				},
+				"description": "Get all active learners"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Learners by Grade Level",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/learners?gradeLevelId={{gradeLevelId}}",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "learners"],
+					"query": [
+						{
+							"key": "gradeLevelId",
+							"value": "{{gradeLevelId}}"
+						}
+					]
+				},
+				"description": "Filter learners by grade level"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Learners by Grade Level and School",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/learners?gradeLevelId={{gradeLevelId}}&schoolId={{schoolId}}",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "learners"],
+					"query": [
+						{
+							"key": "gradeLevelId",
+							"value": "{{gradeLevelId}}"
+						},
+						{
+							"key": "schoolId",
+							"value": "{{schoolId}}"
+						}
+					]
+				},
+				"description": "Filter learners by grade level and school"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Learner by ID",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/learners/{{learnerId}}",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "learners", "{{learnerId}}"]
+				},
+				"description": "Get a specific learner by ID"
+			},
+			"response": []
+		},
+		{
+			"name": "Update Learner",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"schoolId\": \"{{schoolId}}\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe-Updated\",\n  \"gradeLevelId\": \"{{gradeLevelId}}\",\n  \"dateOfBirth\": \"2010-05-15\",\n  \"sex\": \"Male\",\n  \"previousSchoolName\": \"Springfield Elementary\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/learners/{{learnerId}}",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "learners", "{{learnerId}}"]
+				},
+				"description": "Update learner information"
+			},
+			"response": []
+		},
+		{
+			"name": "Deactivate Learner",
+			"request": {
+				"method": "PATCH",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/learners/{{learnerId}}/deactivate",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "learners", "{{learnerId}}", "deactivate"]
+				},
+				"description": "Deactivate a learner"
+			},
+			"response": []
+		},
+		{
+			"name": "Activate Learner",
+			"request": {
+				"method": "PATCH",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/learners/{{learnerId}}/activate",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "learners", "{{learnerId}}", "activate"]
+				},
+				"description": "Activate a learner"
+			},
+			"response": []
+		},
+		{
+			"name": "Validation Test - Missing Required Fields",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/learners",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "learners"]
+				},
+				"description": "Test validation - should return 400 error"
+			},
+			"response": []
+		},
+		{
+			"name": "Validation Test - Blank First Name",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"schoolId\": \"{{schoolId}}\",\n  \"firstName\": \"\",\n  \"lastName\": \"Doe\",\n  \"gradeLevelId\": \"{{gradeLevelId}}\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/learners",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "learners"]
+				},
+				"description": "Test validation - should return 400 error"
+			},
+			"response": []
+		}
+	]
+}

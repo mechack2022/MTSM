@@ -9,6 +9,7 @@ import { useEffect } from 'react'
 import { loginSchema, type LoginFormData } from '@/lib/validations/auth'
 import { useLogin } from '@/hooks'
 import { useAuth } from '@/store'
+import AnimatedBackground from '@/components/AnimatedBackground'
 
 export default function LoginPage() {
   const { user, token } = useAuth()
@@ -39,11 +40,29 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-4">
-      <div className="max-w-md w-full">
+    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
+      <AnimatedBackground />
+
+      <div className="max-w-md w-full relative z-10 animate-fade-in-up">
+        <style>{`
+          @keyframes fadeInUp {
+            from {
+              opacity: 0;
+              transform: translateY(30px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          .animate-fade-in-up {
+            animation: fadeInUp 0.6s ease-out;
+          }
+        `}</style>
+
         {/* Logo & Title */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full mb-4 shadow-lg hover:scale-110 transition-transform duration-300">
             <svg
               className="w-10 h-10 text-white"
               fill="none"
@@ -59,10 +78,10 @@ export default function LoginPage() {
             </svg>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            School Attendance
+            ACE EDUManage
           </h1>
           <p className="text-gray-600">
-            Sign in to manage your school's attendance
+            Sign in to your school management system
           </p>
         </div>
 
@@ -262,7 +281,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="mt-8 text-center text-xs text-gray-500">
-          &copy; 2024 School Attendance System. All rights reserved.
+          &copy; 2026 ACE EDUManage. All rights reserved.
         </p>
       </div>
     </div>

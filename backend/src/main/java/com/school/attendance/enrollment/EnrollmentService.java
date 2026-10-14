@@ -116,8 +116,14 @@ public class EnrollmentService {
     }
 
     public List<EnrollmentResponse> getEnrollmentsByClass(UUID classSectionId) {
-        UUID tenantId = getTenantId();
         CustomUserDetails currentUser = getCurrentUserDetails();
+
+        // Platform admins don't have tenant context - return empty list
+        if (currentUser.isPlatformAdmin()) {
+            return List.of();
+        }
+
+        UUID tenantId = currentUser.getTenantId();
 
         // Validate class section exists and belongs to tenant
         ClassSection classSection = classSectionRepository.findById(classSectionId)
@@ -139,7 +145,14 @@ public class EnrollmentService {
     }
 
     public List<EnrollmentResponse> getEnrollmentsByLearner(UUID learnerId) {
-        UUID tenantId = getTenantId();
+        CustomUserDetails currentUser = getCurrentUserDetails();
+
+        // Platform admins don't have tenant context - return empty list
+        if (currentUser.isPlatformAdmin()) {
+            return List.of();
+        }
+
+        UUID tenantId = currentUser.getTenantId();
 
         // Validate learner exists and belongs to tenant
         Learner learner = learnerRepository.findById(learnerId)
@@ -156,7 +169,14 @@ public class EnrollmentService {
     }
 
     public List<EnrollmentResponse> getEnrollmentsByAcademicYear(UUID academicYearId) {
-        UUID tenantId = getTenantId();
+        CustomUserDetails currentUser = getCurrentUserDetails();
+
+        // Platform admins don't have tenant context - return empty list
+        if (currentUser.isPlatformAdmin()) {
+            return List.of();
+        }
+
+        UUID tenantId = currentUser.getTenantId();
 
         // Validate academic year exists and belongs to tenant
         codeSetService.validateCodeExists(CodeSetGroup.ACADEMIC_YEAR, academicYearId);

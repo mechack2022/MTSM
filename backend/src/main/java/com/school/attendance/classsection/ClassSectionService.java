@@ -75,15 +75,28 @@ public class ClassSectionService {
     }
 
     public List<ClassSectionResponse> getAllActiveClasses() {
-        UUID tenantId = getTenantId();
+        CustomUserDetails currentUser = getCurrentUserDetails();
+
+        // Platform admins don't have tenant context - return empty list
+        if (currentUser.isPlatformAdmin()) {
+            return List.of();
+        }
+
+        UUID tenantId = currentUser.getTenantId();
         return classSectionRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
                 .map(classSectionMapper::toDto)
                 .toList();
     }
 
     public List<ClassSectionResponse> getClassesByAcademicYear(UUID academicYearId, UUID schoolId) {
-        UUID tenantId = getTenantId();
         CustomUserDetails currentUser = getCurrentUserDetails();
+
+        // Platform admins don't have tenant context - return empty list
+        if (currentUser.isPlatformAdmin()) {
+            return List.of();
+        }
+
+        UUID tenantId = currentUser.getTenantId();
 
         if (schoolId != null) {
             // Validate school access
@@ -106,8 +119,14 @@ public class ClassSectionService {
     }
 
     public List<ClassSectionResponse> getClassesByGradeLevel(UUID gradeLevelId, UUID schoolId) {
-        UUID tenantId = getTenantId();
         CustomUserDetails currentUser = getCurrentUserDetails();
+
+        // Platform admins don't have tenant context - return empty list
+        if (currentUser.isPlatformAdmin()) {
+            return List.of();
+        }
+
+        UUID tenantId = currentUser.getTenantId();
 
         if (schoolId != null) {
             // Validate school access

@@ -6,6 +6,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth, useCurrentContext } from '@/store'
 import { useLogout } from '@/hooks'
 import { useActiveLearners, useActiveClasses } from '@/hooks'
+import AnimatedBackground from '@/components/AnimatedBackground'
 
 export default function DashboardPage() {
   const navigate = useNavigate()
@@ -21,9 +22,11 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen relative overflow-hidden">
+      <AnimatedBackground />
+
       {/* Navigation Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <header className="bg-white/95 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-20 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo & Title */}
@@ -45,7 +48,7 @@ export default function DashboardPage() {
               </div>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">
-                  School Attendance
+                  ACE EDUManage
                 </h1>
                 {selectedSchool && (
                   <p className="text-xs text-gray-600">{selectedSchool.name}</p>
@@ -69,6 +72,20 @@ export default function DashboardPage() {
                   Tenants
                 </Link>
               )}
+              {!user?.isPlatformAdmin && (
+                <Link
+                  to="/code-sets"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  CodeSets
+                </Link>
+              )}
+              <Link
+                to="/schools"
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Schools
+              </Link>
               <Link
                 to="/attendance"
                 className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
@@ -115,7 +132,7 @@ export default function DashboardPage() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
         {/* Welcome Section */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">

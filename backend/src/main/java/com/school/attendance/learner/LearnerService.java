@@ -76,7 +76,14 @@ public class LearnerService {
     }
 
     public List<LearnerResponse> getAllActiveLearners() {
-        UUID tenantId = getTenantId();
+        CustomUserDetails currentUser = getCurrentUserDetails();
+
+        // Platform admins don't have tenant context - return empty list
+        if (currentUser.isPlatformAdmin()) {
+            return List.of();
+        }
+
+        UUID tenantId = currentUser.getTenantId();
         return learnerRepository.findByTenantIdAndIsActiveTrueOrderByLastNameAscFirstNameAsc(tenantId)
                 .stream()
                 .map(learnerMapper::toDto)
@@ -84,8 +91,14 @@ public class LearnerService {
     }
 
     public List<LearnerResponse> getLearnersByGradeLevel(UUID gradeLevelId, UUID schoolId) {
-        UUID tenantId = getTenantId();
         CustomUserDetails currentUser = getCurrentUserDetails();
+
+        // Platform admins don't have tenant context - return empty list
+        if (currentUser.isPlatformAdmin()) {
+            return List.of();
+        }
+
+        UUID tenantId = currentUser.getTenantId();
 
         if (schoolId != null) {
             // Validate school access

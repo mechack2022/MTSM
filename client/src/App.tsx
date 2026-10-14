@@ -23,9 +23,12 @@ import { useAuth } from '@/store'
 // ============================================================================
 
 // These will be created in the next steps
+import LandingPage from '@/pages/landing'
 import LoginPage from '@/pages/login'
 import DashboardPage from '@/pages/dashboard'
 import TenantsPage from '@/pages/tenants'
+import CodeSetsPage from '@/pages/code-sets'
+import SchoolsPage from '@/pages/schools'
 import AttendancePage from '@/pages/attendance'
 import LearnersPage from '@/pages/learners'
 import ClassesPage from '@/pages/classes'
@@ -104,9 +107,13 @@ function SyncManagerWrapper() {
 // ============================================================================
 
 function AppRoutes() {
+  const { user, token } = useAuth()
+  const isAuthenticated = !!user && !!token
+
   return (
     <Routes>
       {/* Public Routes */}
+      <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
 
       {/* Protected Routes */}
@@ -123,6 +130,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <TenantsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/code-sets"
+        element={
+          <ProtectedRoute>
+            <CodeSetsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/schools"
+        element={
+          <ProtectedRoute>
+            <SchoolsPage />
           </ProtectedRoute>
         }
       />
@@ -159,11 +182,11 @@ function AppRoutes() {
         }
       />
 
-      {/* Default Redirect */}
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-
-      {/* 404 Not Found */}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* 404 Not Found - redirect to landing or dashboard based on auth */}
+      <Route
+        path="*"
+        element={<Navigate to={isAuthenticated ? '/dashboard' : '/'} replace />}
+      />
     </Routes>
   )
 }

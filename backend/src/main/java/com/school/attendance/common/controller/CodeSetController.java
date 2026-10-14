@@ -48,11 +48,12 @@ public class CodeSetController {
     public ResponseEntity<ApiResponse<List<CodeSetResponse>>> getActiveCodeSetsByGroup(
             @RequestParam CodeSetGroup group,
             @RequestParam(defaultValue = "false") boolean includeInactive,
+            @RequestParam(required = false) UUID tenantId,
             HttpServletRequest httpRequest) {
 
         List<CodeSetResponse> codeSets = includeInactive
-                ? codeSetService.getAllCodeSetsByGroup(group)
-                : codeSetService.getActiveCodeSetsByGroup(group);
+                ? codeSetService.getAllCodeSetsByGroup(group, tenantId)
+                : codeSetService.getActiveCodeSetsByGroup(group, tenantId);
 
         return ResponseEntity.ok(
                 ApiResponse.success(

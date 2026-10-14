@@ -57,9 +57,32 @@ export interface School {
   email: string | null
   logoUrl: string | null
   academicYearId: string | null
+  academicYearDisplayName?: string | null
   currentTermId: string | null
+  currentTermDisplayName?: string | null
   createdAt: string
+  createdBy?: string | null
   updatedAt: string
+  updatedBy?: string | null
+}
+
+export interface CreateSchoolRequest {
+  name: string
+  code: string
+  address?: string | null
+  phone?: string | null
+  email?: string | null
+  logoUrl?: string | null
+}
+
+export interface UpdateSchoolRequest {
+  name?: string
+  academicYearId?: string | null
+  currentTermId?: string | null
+  address?: string | null
+  phone?: string | null
+  email?: string | null
+  logoUrl?: string | null
 }
 
 export interface User {
@@ -80,8 +103,7 @@ export interface User {
 
 export interface CodeSet {
   id: string
-  tenantId: string
-  codeSetGroup: CodeSetGroup
+  codeSetGroup: string
   code: string
   displayName: string
   description: string | null
@@ -89,15 +111,20 @@ export interface CodeSet {
   sortOrder: number
   isActive: boolean
   createdAt: string
-  updatedAt: string
+  createdBy: string | null
 }
 
 export type CodeSetGroup =
-  | 'ACADEMIC_YEAR'
-  | 'TERM'
   | 'GRADE_LEVEL'
   | 'ATTENDANCE_STATUS'
   | 'ABSENCE_REASON'
+  | 'ACADEMIC_YEAR'
+  | 'ACADEMIC_TERM'
+  | 'GENDER'
+  | 'RELIGION'
+  | 'NATIONALITY'
+  | 'BLOOD_GROUP'
+  | 'STUDENT_NUMBER_PATTERN'
 
 export interface Learner {
   id: string

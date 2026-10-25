@@ -11,6 +11,87 @@ import { invalidateQueries } from '@/lib/query-client'
 import type { LoginRequest, LoginResponse } from '@/types'
 
 // ============================================================================
+// DUMMY CREDENTIALS FOR TESTING (Remove when connecting to backend)
+// ============================================================================
+//
+// TEST ACCOUNTS - Use these credentials to test different user flows:
+//
+// 1. SUPER ADMIN (Platform-wide access)
+//    Username: superadmin
+//    Password: admin123
+//    Access: Manage all tenants, system settings
+//
+// 2. TENANT ADMIN (Organization/District level)
+//    Username: tenantadmin
+//    Password: admin123
+//    Access: Manage schools within tenant
+//
+// 3. SCHOOL ADMIN (School level)
+//    Username: schooladmin
+//    Password: admin123
+//    Access: Manage specific school
+//
+// 4. HEAD TEACHER (School level)
+//    Username: headteacher
+//    Password: admin123
+//    Access: Academic management
+//
+// 5. TEACHER (Classroom level)
+//    Username: teacher
+//    Password: admin123
+//    Access: Classes, attendance, grading
+//
+// ============================================================================
+
+const DUMMY_USERS = {
+  'superadmin': {
+    password: 'admin123',
+    userId: '1',
+    username: 'Dr. Farouk Bello',
+    role: 'PLATFORM_ADMIN',
+    token: 'dummy-token-superadmin',
+    tenantId: null,
+    schoolId: null,
+  },
+  'tenantadmin': {
+    password: 'admin123',
+    userId: '2',
+    username: 'Chief Dr. Adebayo Adeleke',
+    role: 'TENANT_ADMIN',
+    token: 'dummy-token-tenantadmin',
+    tenantId: 'tenant-001',
+    schoolId: null,
+  },
+  'schooladmin': {
+    password: 'admin123',
+    userId: '3',
+    username: 'Mrs. Folashade Adeleke',
+    role: 'SCHOOL_ADMIN',
+    token: 'dummy-token-schooladmin',
+    tenantId: 'tenant-001',
+    schoolId: 'school-001',
+  },
+  'headteacher': {
+    password: 'admin123',
+    userId: '4',
+    username: 'Mr. Chukwuma Okonkwo',
+    role: 'HEAD_TEACHER',
+    token: 'dummy-token-headteacher',
+    tenantId: 'tenant-001',
+    schoolId: 'school-001',
+  },
+  'teacher': {
+    password: 'admin123',
+    userId: '5',
+    username: 'Ms. Aisha Mohammed',
+    role: 'TEACHER',
+    token: 'dummy-token-teacher',
+    tenantId: 'tenant-001',
+    schoolId: 'school-001',
+  },
+}
+
+// ============================================================================
 // LOGIN
 // ============================================================================
 
@@ -20,15 +101,36 @@ export function useLogin() {
 
   return useMutation({
     mutationFn: async (credentials: LoginRequest) => {
-      const response = await api.post<LoginResponse>('/auth/login', credentials)
-      return response.data!
+      // DUMMY LOGIN - Replace with real API call when connecting to backend
+      await new Promise(resolve => setTimeout(resolve, 800)) // Simulate network delay
+
+      const user = DUMMY_USERS[credentials.username.toLowerCase() as keyof typeof DUMMY_USERS]
+
+      if (!user || user.password !== credentials.password) {
+        throw new Error('Invalid username or password')
+      }
+
+      return {
+        userId: user.userId,
+        username: user.username,
+        role: user.role,
+        token: user.token,
+        tenantId: user.tenantId,
+        schoolId: user.schoolId,
+      } as LoginResponse
+
+      // REAL LOGIN (commented out for now)
+      // const response = await api.post<LoginResponse>('/auth/login', credentials)
+      // return response.data!
     },
 
     onSuccess: (data) => {
+      console.log('useLogin.onSuccess: Starting login success handler', { role: data.role })
+
       // Create user object from response
       const user = {
         id: data.userId,
-        tenantId: '',
+        tenantId: data.tenantId || '',
         username: data.username,
         fullName: data.username,
         roleId: data.role,
@@ -39,6 +141,8 @@ export function useLogin() {
         updatedAt: new Date().toISOString(),
       }
 
+      console.log('useLogin.onSuccess: Created user object:', user)
+
       // Save auth data to store
       setAuth({
         user,
@@ -47,8 +151,39 @@ export function useLogin() {
         assignedSchools: [],
       })
 
+      console.log('useLogin.onSuccess: Auth state saved to store')
+
+      // Verify the state was actually saved
+      const currentState = useAppStore.getState()
+      console.log('useLogin.onSuccess: Current store state:', {
+        hasUser: !!currentState.user,
+        hasToken: !!currentState.token,
+        userName: currentState.user?.fullName
+      })
+
       toast.success(`Welcome back, ${data.username}!`)
-      navigate('/dashboard', { replace: true })
+
+      // Route to appropriate dashboard based on role with a delay to ensure state is persisted to localStorage
+      setTimeout(() => {
+        // Double-check the state before navigating
+        const finalState = useAppStore.getState()
+        console.log('useLogin.onSuccess: State before navigation:', {
+          hasUser: !!finalState.user,
+          hasToken: !!finalState.token,
+          userName: finalState.user?.fullName
+        })
+
+        if (data.role === 'PLATFORM_ADMIN') {
+          console.log('useLogin.onSuccess: Navigating PLATFORM_ADMIN to /tenants')
+          navigate('/tenants', { replace: true })
+        } else if (data.role === 'TENANT_ADMIN') {
+          console.log('useLogin.onSuccess: Navigating TENANT_ADMIN to /tenant-admin/dashboard')
+          navigate('/tenant-admin/dashboard', { replace: true })
+        } else {
+          console.log('useLogin.onSuccess: Navigating to /dashboard')
+          navigate('/dashboard', { replace: true })
+        }
+      }, 300)
     },
 
     onError: (error: any) => {
@@ -81,8 +216,8 @@ export function useLogout() {
 
       toast.success('Logged out successfully')
 
-      // Navigate to login
-      navigate('/login')
+      // Navigate to landing page (login page is at '/')
+      navigate('/')
     },
   })
 }

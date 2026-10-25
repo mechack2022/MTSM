@@ -16,6 +16,7 @@ backend/.settings/
 backend/.classpath
 backend/.project
 backend/bin/
+*.md
 #backend/mvnw
 #backend/mvnw.cmd
 

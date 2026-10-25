@@ -1,369 +1,378 @@
-// ============================================================================
-// DASHBOARD PAGE - Main Dashboard with Navigation
-// ============================================================================
-
-import { Link, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuth, useCurrentContext } from '@/store'
 import { useLogout } from '@/hooks'
-import { useActiveLearners, useActiveClasses } from '@/hooks'
-import AnimatedBackground from '@/components/AnimatedBackground'
+
+// Role-based dashboard components
+import SuperAdminDashboard from '@/components/dashboards/SuperAdminDashboard'
+import TenantAdminDashboard from '@/components/dashboards/TenantAdminDashboard'
+import SchoolAdminDashboard from '@/pages/school-admin-dashboard'
+import HeadTeacherDashboard from '@/components/dashboards/HeadTeacherDashboard'
+import TeacherDashboard from '@/components/dashboards/TeacherDashboard'
 
 export default function DashboardPage() {
-  const navigate = useNavigate()
+  const location = useLocation()
   const { user } = useAuth()
   const { selectedSchool } = useCurrentContext()
   const logout = useLogout()
-
-  const { data: learners, isLoading: learnersLoading } = useActiveLearners()
-  const { data: classes, isLoading: classesLoading } = useActiveClasses()
+  const [sidebarOpen, setSidebarOpen] = useState(true)
 
   const handleLogout = () => {
     logout.mutate()
   }
 
-  return (
-    <div className="min-h-screen relative overflow-hidden">
-      <AnimatedBackground />
+  // Determine which dashboard to show based on role
+  const renderDashboard = () => {
+    const roleName = user?.roleName?.toUpperCase()
 
-      {/* Navigation Header */}
-      <header className="bg-white/95 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-20 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            {/* Logo & Title */}
+    switch (roleName) {
+      case 'SUPER_ADMIN':
+        return <SuperAdminDashboard />
+      case 'TENANT_ADMIN':
+        return <TenantAdminDashboard />
+      case 'SCHOOL_ADMIN':
+        return <SchoolAdminDashboard />
+      case 'HEAD_TEACHER':
+        return <HeadTeacherDashboard />
+      case 'TEACHER':
+        return <TeacherDashboard />
+      default:
+        return <SuperAdminDashboard /> // Default fallback to SuperAdmin for demo
+    }
+  }
+
+  // School admin has its own layout, render it directly
+  if (user?.roleName?.toUpperCase() === 'SCHOOL_ADMIN') {
+    return <SchoolAdminDashboard />
+  }
+
+  const isActive = (path: string) => {
+    return location.pathname === path
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      {/* Top Header */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
+        <div className="flex items-center justify-between h-16 px-6">
+          {/* Left: Logo & Menu Toggle */}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
             <div className="flex items-center gap-3">
               <div className="flex items-center justify-center w-10 h-10 bg-blue-600 rounded-lg">
-                <svg
-                  className="w-6 h-6 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">
-                  ACE EDUManage
-                </h1>
+                <h1 className="text-xl font-bold text-gray-900">ACE EDUManage</h1>
                 {selectedSchool && (
                   <p className="text-xs text-gray-600">{selectedSchool.name}</p>
                 )}
               </div>
             </div>
+          </div>
 
-            {/* Navigation Links */}
-            <nav className="hidden md:flex items-center gap-1">
-              <Link
-                to="/dashboard"
-                className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg"
-              >
-                Dashboard
-              </Link>
-              {user?.isPlatformAdmin && (
-                <Link
-                  to="/tenants"
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  Tenants
-                </Link>
-              )}
-              {!user?.isPlatformAdmin && (
-                <Link
-                  to="/code-sets"
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  CodeSets
-                </Link>
-              )}
-              <Link
-                to="/schools"
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                Schools
-              </Link>
-              <Link
-                to="/attendance"
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                Attendance
-              </Link>
-              <Link
-                to="/learners"
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                Learners
-              </Link>
-              <Link
-                to="/classes"
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                Classes
-              </Link>
-              <Link
-                to="/reports"
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                Reports
-              </Link>
-            </nav>
+          {/* Right: User Menu */}
+          <div className="flex items-center gap-4">
+            {/* Notifications */}
+            <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors relative">
+              <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+            </button>
 
-            {/* User Menu */}
-            <div className="flex items-center gap-3">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-medium text-gray-900">
-                  {user?.fullName}
-                </p>
-                <p className="text-xs text-gray-600">{user?.username}</p>
+            {/* Settings */}
+            <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
+
+            {/* User Profile */}
+            <div className="flex items-center gap-3 pl-4 border-l border-gray-200">
+              <div className="text-right">
+                <p className="text-sm font-medium text-gray-900">{user?.fullName}</p>
+                <p className="text-xs text-gray-600">{user?.roleName || user?.username}</p>
               </div>
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              >
-                Logout
-              </button>
+              <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                <span className="text-white font-semibold text-sm">
+                  {user?.fullName?.charAt(0) || 'U'}
+                </span>
+              </div>
             </div>
+
+            {/* Logout */}
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            >
+              Logout
+            </button>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Welcome back, {user?.fullName?.split(' ')[0]}! 👋
-          </h2>
-          <p className="text-gray-600">
-            Here's what's happening with your school today.
-          </p>
-        </div>
+      {/* Main Layout Container */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Sidebar */}
+        <aside
+          className={`${
+            sidebarOpen ? 'w-64' : 'w-0'
+          } bg-slate-900 text-white transition-all duration-300 overflow-hidden flex-shrink-0`}
+        >
+          <nav className="p-4 space-y-1">
+            {/* SuperAdmin Menu */}
+            {user?.roleName?.toUpperCase() === 'SUPER_ADMIN' && (
+              <>
+                <div className="mb-4">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-3">
+                    Federal Operations
+                  </p>
+                  <Link
+                    to="/dashboard"
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                      isActive('/dashboard')
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    <span className="font-medium">Core Infrastructure</span>
+                  </Link>
 
-        {/* School Info Banner */}
-        {selectedSchool && (
-          <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl p-6 mb-8 text-white">
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="text-xl font-bold mb-1">{selectedSchool.name}</h3>
-                <p className="text-blue-100 text-sm">{selectedSchool.address || 'No address'}</p>
-                <p className="text-blue-100 text-sm mt-1">
-                  Contact: {selectedSchool.phone || 'No contact'}
+                  <Link
+                    to="/dashboard"
+                    className={`flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                      isActive('/dashboard')
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                      <span className="font-medium">Tenants & Orgs</span>
+                    </div>
+                    <span className="px-2 py-0.5 bg-teal-500 text-white text-xs font-bold rounded">1,248</span>
+                  </Link>
+
+                  <Link
+                    to="/schools"
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                      isActive('/schools')
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    <span className="font-medium">Schools & Campuses</span>
+                  </Link>
+
+                  <Link
+                    to="/dashboard"
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-gray-300 hover:bg-slate-800`}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="font-medium">Multi-Region Nodes</span>
+                  </Link>
+
+                  <Link
+                    to="/dashboard"
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-gray-300 hover:bg-slate-800`}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                    <span className="font-medium">NDPA Compliance</span>
+                  </Link>
+
+                  <Link
+                    to="/dashboard"
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-gray-300 hover:bg-slate-800`}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <span className="font-medium">Billing & Quotas</span>
+                  </Link>
+
+                  <Link
+                    to="/dashboard"
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-gray-300 hover:bg-slate-800`}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                    </svg>
+                    <span className="font-medium">System Audit Logs</span>
+                  </Link>
+                </div>
+              </>
+            )}
+
+            {/* Regular Admin Menu */}
+            {user?.roleName?.toUpperCase() !== 'SUPER_ADMIN' && (
+              <>
+              <div className="mb-4">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-3">
+                  Core Administration
                 </p>
-              </div>
-              <div className="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2">
-                <p className="text-xs text-blue-100">School Code</p>
-                <p className="font-mono text-sm">{selectedSchool.code || 'N/A'}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {!selectedSchool && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 mb-8">
-            <div className="flex items-start gap-3">
-              <svg className="w-6 h-6 text-yellow-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              <div>
-                <h3 className="text-sm font-semibold text-yellow-900 mb-1">
-                  No School Selected
-                </h3>
-                <p className="text-sm text-yellow-800">
-                  You don't have any schools assigned yet. Please contact your administrator.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Total Learners */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <div className="bg-blue-100 rounded-lg p-3">
-                <svg
-                  className="w-6 h-6 text-blue-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-                  />
+              <Link
+                to="/dashboard"
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                  isActive('/dashboard')
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-300 hover:bg-slate-800'
+                }`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                 </svg>
-              </div>
-              <span className="text-xs font-medium text-gray-500 uppercase">
-                Learners
-              </span>
-            </div>
-            <div>
-              <p className="text-3xl font-bold text-gray-900">
-                {learnersLoading ? (
-                  <span className="animate-pulse">...</span>
-                ) : (
-                  learners?.length || 0
-                )}
-              </p>
-              <p className="text-sm text-gray-600 mt-1">Active students</p>
-            </div>
-          </div>
+                <span className="font-medium">Overview & Metrics</span>
+              </Link>
 
-          {/* Total Classes */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <div className="bg-green-100 rounded-lg p-3">
-                <svg
-                  className="w-6 h-6 text-green-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+              {user?.isPlatformAdmin && (
+                <Link
+                  to="/tenants"
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                    isActive('/tenants')
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-300 hover:bg-slate-800'
+                  }`}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                  />
-                </svg>
-              </div>
-              <span className="text-xs font-medium text-gray-500 uppercase">
-                Classes
-              </span>
-            </div>
-            <div>
-              <p className="text-3xl font-bold text-gray-900">
-                {classesLoading ? (
-                  <span className="animate-pulse">...</span>
-                ) : (
-                  classes?.length || 0
-                )}
-              </p>
-              <p className="text-sm text-gray-600 mt-1">Active class sections</p>
-            </div>
-          </div>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                  <span className="font-medium">Tenants</span>
+                </Link>
+              )}
 
-          {/* Today's Attendance */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <div className="bg-purple-100 rounded-lg p-3">
-                <svg
-                  className="w-6 h-6 text-purple-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+              <Link
+                to="/schools"
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                  isActive('/schools')
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-300 hover:bg-slate-800'
+                }`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+                <span className="font-medium">Schools</span>
+              </Link>
+
+              {!user?.isPlatformAdmin && (
+                <Link
+                  to="/code-sets"
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                    isActive('/code-sets')
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-300 hover:bg-slate-800'
+                  }`}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-                  />
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                  </svg>
+                  <span className="font-medium">CodeSets</span>
+                </Link>
+              )}
+            </div>
+
+            {/* Curriculum & Learning */}
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-3">
+                Curriculum & Learning
+              </p>
+              <Link
+                to="/classes"
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                  isActive('/classes')
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-300 hover:bg-slate-800'
+                }`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                 </svg>
-              </div>
-              <span className="text-xs font-medium text-gray-500 uppercase">
-                Today
-              </span>
+                <span className="font-medium">Classes & Streams</span>
+              </Link>
+
+              <Link
+                to="/learners"
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                  isActive('/learners')
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-300 hover:bg-slate-800'
+                }`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+                <span className="font-medium">Learners</span>
+              </Link>
+
+              <Link
+                to="/attendance"
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                  isActive('/attendance')
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-300 hover:bg-slate-800'
+                }`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+                <span className="font-medium">Daily Attendance</span>
+              </Link>
             </div>
-            <div>
-              <p className="text-3xl font-bold text-gray-900">-</p>
-              <p className="text-sm text-gray-600 mt-1">
-                Attendance not implemented
+
+            {/* Finance & Development */}
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-3">
+                Finance & Development
               </p>
+              <Link
+                to="/reports"
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                  isActive('/reports')
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-300 hover:bg-slate-800'
+                }`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                <span className="font-medium">Reports</span>
+              </Link>
             </div>
+            </>
+            )}
+          </nav>
+        </aside>
+
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="p-8">
+            {renderDashboard()}
           </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-bold text-gray-900 mb-4">
-            Quick Actions
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <button
-              onClick={() => navigate('/attendance')}
-              className="group p-4 border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all text-left"
-            >
-              <div className="text-3xl mb-3">📋</div>
-              <h4 className="font-semibold text-gray-900 group-hover:text-blue-600 mb-1">
-                Mark Attendance
-              </h4>
-              <p className="text-sm text-gray-600">
-                Record daily attendance for classes
-              </p>
-            </button>
-
-            <button
-              onClick={() => navigate('/learners')}
-              className="group p-4 border-2 border-gray-200 rounded-xl hover:border-green-500 hover:bg-green-50 transition-all text-left"
-            >
-              <div className="text-3xl mb-3">👥</div>
-              <h4 className="font-semibold text-gray-900 group-hover:text-green-600 mb-1">
-                Manage Learners
-              </h4>
-              <p className="text-sm text-gray-600">
-                Add, edit, or view learner profiles
-              </p>
-            </button>
-
-            <button
-              onClick={() => navigate('/classes')}
-              className="group p-4 border-2 border-gray-200 rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all text-left"
-            >
-              <div className="text-3xl mb-3">🏫</div>
-              <h4 className="font-semibold text-gray-900 group-hover:text-purple-600 mb-1">
-                Manage Classes
-              </h4>
-              <p className="text-sm text-gray-600">
-                View and manage class sections
-              </p>
-            </button>
-
-            <button
-              onClick={() => navigate('/reports')}
-              className="group p-4 border-2 border-gray-200 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all text-left"
-            >
-              <div className="text-3xl mb-3">📊</div>
-              <h4 className="font-semibold text-gray-900 group-hover:text-orange-600 mb-1">
-                View Reports
-              </h4>
-              <p className="text-sm text-gray-600">
-                Attendance analytics and insights
-              </p>
-            </button>
-          </div>
-        </div>
-
-        {/* Recent Activity Placeholder */}
-        <div className="mt-8 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-bold text-gray-900 mb-4">
-            Recent Activity
-          </h3>
-          <div className="text-center py-12 text-gray-500">
-            <svg
-              className="w-16 h-16 mx-auto mb-4 text-gray-300"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-            <p className="text-sm">No recent activity to display</p>
-          </div>
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   )
 }

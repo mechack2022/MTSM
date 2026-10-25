@@ -90,6 +90,12 @@ export const useAppStore = create<AppStore>()(
       assignedSchools: [],
 
       setAuth: ({ user, token, tenant, assignedSchools }) => {
+        console.log('Store.setAuth called with:', {
+          userId: user.id,
+          userName: user.fullName,
+          token: token?.substring(0, 20) + '...',
+          role: user.roleName
+        })
         set({
           user,
           token,
@@ -97,6 +103,7 @@ export const useAppStore = create<AppStore>()(
           assignedSchools,
           selectedSchool: assignedSchools[0] || null,
         })
+        console.log('Store.setAuth completed, state updated')
       },
 
       clearAuth: () => {
@@ -205,15 +212,18 @@ export const useAppStore = create<AppStore>()(
 
       // ==================== COMPUTED VALUES ====================
       get pendingSyncCount() {
-        return get().offlineQueue.filter((a) => !a.synced).length
+        const state = get()
+        return state.offlineQueue?.filter((a) => !a.synced).length || 0
       },
 
       get isAuthenticated() {
-        return !!get().token && !!get().user
+        const state = get()
+        return !!state.token && !!state.user
       },
 
       get hasSchoolAccess() {
-        return get().assignedSchools.length > 0 || get().user?.isPlatformAdmin
+        const state = get()
+        return (state.assignedSchools?.length || 0) > 0 || state.user?.isPlatformAdmin || false
       },
     }),
     {
@@ -231,6 +241,22 @@ export const useAppStore = create<AppStore>()(
         offlineQueue: state.offlineQueue,
         lastSyncTime: state.lastSyncTime,
       }),
+
+      // Add debugging
+      onRehydrateStorage: () => {
+        console.log('Store: Starting rehydration from localStorage')
+        return (state, error) => {
+          if (error) {
+            console.error('Store: Rehydration failed!', error)
+          } else {
+            console.log('Store: Rehydration completed:', {
+              hasUser: !!state?.user,
+              hasToken: !!state?.token,
+              userName: state?.user?.fullName
+            })
+          }
+        }
+      },
     }
   )
 )

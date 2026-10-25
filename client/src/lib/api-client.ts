@@ -131,7 +131,9 @@ apiClient.interceptors.response.use(
     switch (response.status) {
       case 401:
         // Unauthorized - clear auth and redirect to login
-        handleUnauthorized()
+        // TEMPORARILY DISABLED FOR TESTING WITHOUT BACKEND
+        // handleUnauthorized()
+        console.warn('[API] 401 Unauthorized - Auth clearing disabled for testing')
         return Promise.reject(
           response.data?.error ||
             createApiError('UNAUTHORIZED', 'Authentication required')

@@ -16,8 +16,47 @@ export function useAllTenants() {
   return useQuery({
     queryKey: queryKeys.tenants.all,
     queryFn: async () => {
-      const response = await api.get<Tenant[]>('/tenants')
-      return response.data!
+      // DUMMY DATA - Replace with real API call when connecting to backend
+      await new Promise(resolve => setTimeout(resolve, 500)) // Simulate network delay
+
+      const dummyTenants: Tenant[] = [
+        {
+          id: 'tenant-001',
+          code: 'LAGOS-EDU',
+          name: 'Lagos State Education District',
+          contactEmail: 'admin@lagosedu.ng',
+          contactPhone: '+234 123 456 7890',
+          isActive: true,
+          createdAt: new Date('2024-01-15').toISOString(),
+          updatedAt: new Date('2024-01-15').toISOString(),
+        },
+        {
+          id: 'tenant-002',
+          code: 'ABUJA-SCH',
+          name: 'Federal Capital Territory Schools',
+          contactEmail: 'contact@fctschools.ng',
+          contactPhone: '+234 987 654 3210',
+          isActive: true,
+          createdAt: new Date('2024-02-10').toISOString(),
+          updatedAt: new Date('2024-02-10').toISOString(),
+        },
+        {
+          id: 'tenant-003',
+          code: 'KANO-EDU',
+          name: 'Kano State Educational Authority',
+          contactEmail: 'info@kanoedu.ng',
+          contactPhone: '+234 555 123 4567',
+          isActive: false,
+          createdAt: new Date('2024-03-05').toISOString(),
+          updatedAt: new Date('2024-03-20').toISOString(),
+        },
+      ]
+
+      return dummyTenants
+
+      // REAL API CALL (commented out for now)
+      // const response = await api.get<Tenant[]>('/tenants')
+      // return response.data!
     },
   })
 }

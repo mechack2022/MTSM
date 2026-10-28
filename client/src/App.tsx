@@ -53,6 +53,8 @@ import ClassesPage from '@/pages/classes'
 import ReportsPage from '@/pages/reports'
 import StaffOnboardingPage from '@/pages/staff-onboarding'
 import StaffOnboardingSuccessPage from '@/pages/staff-onboarding-success'
+import CompositeCampusDashboard from '@/pages/composite-campus-dashboard'
+import HeadTeacherDashboard from '@/pages/head-teacher-dashboard'
 
 // ============================================================================
 // PROTECTED ROUTE COMPONENT
@@ -343,6 +345,14 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/composite-campus-dashboard"
+        element={
+          <ProtectedRoute>
+            <CompositeCampusDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/staff-onboarding"
         element={
           <ProtectedRoute>
@@ -355,6 +365,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <StaffOnboardingSuccessPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/head-teacher-dashboard"
+        element={
+          <ProtectedRoute>
+            <HeadTeacherDashboard />
           </ProtectedRoute>
         }
       />

@@ -127,10 +127,101 @@ export default function DashboardPage() {
         {/* Left Sidebar */}
         <aside
           className={`${
-            sidebarOpen ? 'w-64' : 'w-0'
-          } bg-slate-900 text-white transition-all duration-300 overflow-hidden flex-shrink-0`}
+            sidebarOpen ? 'w-72' : 'w-0'
+          } ${
+            user?.roleName?.toUpperCase() === 'HEAD_TEACHER'
+              ? 'bg-surface-container-lowest'
+              : 'bg-slate-900 text-white'
+          } transition-all duration-300 overflow-hidden flex-shrink-0 shadow-[0_1px_8px_rgba(0,0,0,0.04)] flex flex-col justify-between`}
         >
-          <nav className="p-4 space-y-1">
+          {/* Head Teacher Sidebar */}
+          {user?.roleName?.toUpperCase() === 'HEAD_TEACHER' ? (
+            <>
+              <div className="flex flex-col">
+                {/* Header with Logo and Version */}
+                <div className="h-16 px-4 flex items-center justify-between bg-surface-container-low">
+                  <div className="flex items-center gap-2">
+                    <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-on-primary shadow-sm">
+                      <span className="material-symbols-outlined text-[20px]">school</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-semibold text-primary leading-tight">EduManage</span>
+                      <span className="text-[10px] text-on-surface-variant uppercase tracking-wider">Nigeria Portal</span>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded bg-surface-container-highest text-[11px] text-on-surface-variant">v4.2</span>
+                </div>
+
+                {/* Section Label */}
+                <div className="px-4 py-2">
+                  <div className="px-2 py-1 text-[11px] text-on-surface-variant uppercase tracking-wider font-semibold">Academic Leadership</div>
+                </div>
+
+                {/* Navigation */}
+                <nav className="flex flex-col gap-1 px-4">
+                  <Link
+                    to="/dashboard"
+                    className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors text-sm ${
+                      isActive('/dashboard')
+                        ? 'bg-primary text-on-primary font-semibold shadow-sm'
+                        : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[20px]">dashboard</span>
+                    <span>Overview</span>
+                  </Link>
+                  <a className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface text-sm transition-colors" href="#">
+                    <span className="material-symbols-outlined text-[20px]">meeting_room</span>
+                    <span>Classes & Streams</span>
+                  </a>
+                  <a className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface text-sm transition-colors" href="#">
+                    <span className="material-symbols-outlined text-[20px]">how_to_reg</span>
+                    <span>Attendance Register</span>
+                  </a>
+                  <a className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface text-sm transition-colors" href="#">
+                    <span className="material-symbols-outlined text-[20px]">assignment_turned_in</span>
+                    <span>CA & Gradebook</span>
+                  </a>
+                  <a className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface text-sm transition-colors" href="#">
+                    <span className="material-symbols-outlined text-[20px]">menu_book</span>
+                    <span>Lesson Plans & NERDC</span>
+                  </a>
+                  <a className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface text-sm transition-colors" href="#">
+                    <span className="material-symbols-outlined text-[20px]">group</span>
+                    <span>Student Records</span>
+                  </a>
+                  <a className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface text-sm transition-colors" href="#">
+                    <span className="material-symbols-outlined text-[20px]">summarize</span>
+                    <span>Termly Broadsheet</span>
+                  </a>
+                  <a className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface text-sm transition-colors" href="#">
+                    <span className="material-symbols-outlined text-[20px]">calendar_month</span>
+                    <span>Timetable & Relief</span>
+                  </a>
+                </nav>
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 flex flex-col gap-2 bg-surface-container-lowest">
+                <div className="p-2 rounded-xl bg-surface-container-low flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-secondary animate-pulse"></div>
+                    <div className="flex flex-col">
+                      <span className="text-[11px] text-on-surface font-medium">LAG-NODE-03</span>
+                      <span className="text-[10px] text-on-surface-variant">Local Gateway Sync</span>
+                    </div>
+                  </div>
+                  <span className="material-symbols-outlined text-secondary text-[18px]">verified</span>
+                </div>
+                <div className="flex items-center justify-between px-1 text-on-surface-variant">
+                  <span className="text-[10px]">EduManage NG v4.2.1</span>
+                  <span className="text-[10px]">WAEC/NECO Ready</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            // Regular sidebar for other roles
+            <nav className="p-4 space-y-1">
             {/* SuperAdmin Menu */}
             {user?.roleName?.toUpperCase() === 'SUPER_ADMIN' && (
               <>
@@ -364,6 +455,7 @@ export default function DashboardPage() {
             </>
             )}
           </nav>
+          )}
         </aside>
 
         {/* Main Content Area */}

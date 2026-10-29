@@ -12,12 +12,23 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AddTeachingAssignmentModal from '@/components/modals/AddTeachingAssignmentModal'
+import EditAllocationModal from '@/components/modals/EditAllocationModal'
+import ViewScheduleModal from '@/components/modals/ViewScheduleModal'
+import ViewHomeroomModal from '@/components/modals/ViewHomeroomModal'
+import ReviewDossierModal from '@/components/modals/ReviewDossierModal'
+import ConfirmRosterModal from '@/components/modals/ConfirmRosterModal'
 
 export default function EmploymentAssignmentsPage() {
   const navigate = useNavigate()
   const [selectedScope, setSelectedScope] = useState('Whole School')
   const [staffManagementOpen, setStaffManagementOpen] = useState(true)
   const [isAddAssignmentModalOpen, setIsAddAssignmentModalOpen] = useState(false)
+  const [isEditAllocationModalOpen, setIsEditAllocationModalOpen] = useState(false)
+  const [isViewScheduleModalOpen, setIsViewScheduleModalOpen] = useState(false)
+  const [isViewHomeroomModalOpen, setIsViewHomeroomModalOpen] = useState(false)
+  const [isReviewDossierModalOpen, setIsReviewDossierModalOpen] = useState(false)
+  const [isConfirmRosterModalOpen, setIsConfirmRosterModalOpen] = useState(false)
+  const [selectedStaff, setSelectedStaff] = useState<any>(null)
 
   // Sample staff assignments data
   const staffAssignments = [
@@ -586,19 +597,47 @@ export default function EmploymentAssignmentsPage() {
                     <div className="mt-4 flex items-center justify-end gap-2">
                       {staff.pending ? (
                         <>
-                          <button className="px-4 py-1.5 rounded-lg text-gray-600 hover:bg-gray-100 font-semibold text-xs transition-colors">
+                          <button
+                            onClick={() => {
+                              setSelectedStaff(staff)
+                              setIsReviewDossierModalOpen(true)
+                            }}
+                            className="px-4 py-1.5 rounded-lg text-gray-600 hover:bg-gray-100 font-semibold text-xs transition-colors"
+                          >
                             Review Dossier
                           </button>
-                          <button className="px-4 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-semibold text-xs shadow-sm transition-all">
+                          <button
+                            onClick={() => {
+                              setSelectedStaff(staff)
+                              setIsConfirmRosterModalOpen(true)
+                            }}
+                            className="px-4 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-semibold text-xs shadow-sm transition-all"
+                          >
                             Confirm Roster
                           </button>
                         </>
                       ) : (
                         <>
-                          <button className="px-4 py-1.5 rounded-lg text-blue-600 hover:bg-blue-50 font-semibold text-xs transition-colors">
+                          <button
+                            onClick={() => {
+                              setSelectedStaff(staff)
+                              if (staff.status === 'Class Tutor') {
+                                setIsViewHomeroomModalOpen(true)
+                              } else {
+                                setIsViewScheduleModalOpen(true)
+                              }
+                            }}
+                            className="px-4 py-1.5 rounded-lg text-blue-600 hover:bg-blue-50 font-semibold text-xs transition-colors"
+                          >
                             {staff.status === 'Class Tutor' ? 'View Homeroom' : 'View Schedule'}
                           </button>
-                          <button className="px-4 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs transition-colors">
+                          <button
+                            onClick={() => {
+                              setSelectedStaff(staff)
+                              setIsEditAllocationModalOpen(true)
+                            }}
+                            className="px-4 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs transition-colors"
+                          >
                             Edit Allocation
                           </button>
                         </>
@@ -778,6 +817,53 @@ export default function EmploymentAssignmentsPage() {
           // Handle save logic here
           setIsAddAssignmentModalOpen(false)
         }}
+      />
+
+      {/* Edit Allocation Modal */}
+      <EditAllocationModal
+        isOpen={isEditAllocationModalOpen}
+        onClose={() => setIsEditAllocationModalOpen(false)}
+        staff={selectedStaff}
+        onSave={(updatedStaff) => {
+          console.log('Updated staff allocation:', updatedStaff)
+          // Handle save logic here
+          setIsEditAllocationModalOpen(false)
+        }}
+      />
+
+      {/* View Schedule Modal */}
+      <ViewScheduleModal
+        isOpen={isViewScheduleModalOpen}
+        onClose={() => setIsViewScheduleModalOpen(false)}
+        teacherName={selectedStaff?.name || ''}
+        teacherId={selectedStaff?.id || ''}
+      />
+
+      {/* View Homeroom Modal */}
+      <ViewHomeroomModal
+        isOpen={isViewHomeroomModalOpen}
+        onClose={() => setIsViewHomeroomModalOpen(false)}
+        className={selectedStaff?.role?.split('·')[1]?.trim() || ''}
+        teacherName={selectedStaff?.name || ''}
+        assistant={selectedStaff?.assistant}
+      />
+
+      {/* Review Dossier Modal */}
+      <ReviewDossierModal
+        isOpen={isReviewDossierModalOpen}
+        onClose={() => setIsReviewDossierModalOpen(false)}
+        staffName={selectedStaff?.name || ''}
+        staffId={selectedStaff?.id || ''}
+      />
+
+      {/* Confirm Roster Modal */}
+      <ConfirmRosterModal
+        isOpen={isConfirmRosterModalOpen}
+        onClose={() => setIsConfirmRosterModalOpen(false)}
+        staffName={selectedStaff?.name || ''}
+        staffId={selectedStaff?.id || ''}
+        role={selectedStaff?.role || ''}
+        assignments={selectedStaff?.assignments || []}
       />
     </div>
   )

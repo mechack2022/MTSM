@@ -8,7 +8,9 @@ import SuperAdminDashboard from '@/components/dashboards/SuperAdminDashboard'
 import TenantAdminDashboard from '@/components/dashboards/TenantAdminDashboard'
 import SchoolAdminDashboard from '@/pages/school-admin-dashboard'
 import HeadTeacherDashboard from '@/components/dashboards/HeadTeacherDashboard'
+import PrincipalDashboard from '@/components/dashboards/PrincipalDashboard'
 import TeacherDashboard from '@/components/dashboards/TeacherDashboard'
+import ClassTeacherDashboard from '@/components/dashboards/ClassTeacherDashboard'
 
 export default function DashboardPage() {
   const location = useLocation()
@@ -34,8 +36,12 @@ export default function DashboardPage() {
         return <SchoolAdminDashboard />
       case 'HEAD_TEACHER':
         return <HeadTeacherDashboard />
+      case 'PRINCIPAL':
+        return <PrincipalDashboard />
       case 'TEACHER':
         return <TeacherDashboard />
+      case 'CLASS_TEACHER':
+        return <ClassTeacherDashboard />
       default:
         return <SuperAdminDashboard /> // Default fallback to SuperAdmin for demo
     }
@@ -129,13 +135,102 @@ export default function DashboardPage() {
           className={`${
             sidebarOpen ? 'w-72' : 'w-0'
           } ${
-            user?.roleName?.toUpperCase() === 'HEAD_TEACHER'
+            user?.roleName?.toUpperCase() === 'HEAD_TEACHER' || user?.roleName?.toUpperCase() === 'PRINCIPAL' || user?.roleName?.toUpperCase() === 'TEACHER' || user?.roleName?.toUpperCase() === 'CLASS_TEACHER'
               ? 'bg-surface-container-lowest'
               : 'bg-slate-900 text-white'
           } transition-all duration-300 overflow-hidden flex-shrink-0 shadow-[0_1px_8px_rgba(0,0,0,0.04)] flex flex-col justify-between`}
         >
-          {/* Head Teacher Sidebar */}
-          {user?.roleName?.toUpperCase() === 'HEAD_TEACHER' ? (
+          {/* Academic Class Menu Sidebar (Class Teacher / Homeroom Tutor) */}
+          {user?.roleName?.toUpperCase() === 'CLASS_TEACHER' ? (
+            <>
+              <div className="flex flex-col">
+                {/* Header with Logo and Version */}
+                <div className="h-16 px-4 flex items-center justify-between bg-surface-container-low">
+                  <div className="flex items-center gap-2">
+                    <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-on-primary shadow-sm">
+                      <span className="material-symbols-outlined text-[20px]">door_front</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-semibold text-primary leading-tight">EduManage</span>
+                      <span className="text-[10px] text-on-surface-variant uppercase tracking-wider">Homeroom Portal</span>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded bg-surface-container-highest text-[11px] text-on-surface-variant">v4.2</span>
+                </div>
+
+                {/* Section Label */}
+                <div className="px-4 py-2">
+                  <div className="px-2 py-1 text-[11px] text-on-surface-variant uppercase tracking-wider font-semibold">Academic Class Menu</div>
+                </div>
+
+                {/* Navigation */}
+                <nav className="flex flex-col gap-1 px-4">
+                  <Link
+                    to="/dashboard"
+                    className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors text-sm ${
+                      isActive('/dashboard')
+                        ? 'bg-primary text-on-primary font-semibold shadow-sm'
+                        : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[20px]">dashboard</span>
+                    <span>Homeroom Overview</span>
+                  </Link>
+                  <a className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface text-sm transition-colors" href="#">
+                    <span className="material-symbols-outlined text-[20px]">diversity_3</span>
+                    <span>My Class Roster</span>
+                  </a>
+                  <a className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface text-sm transition-colors" href="#">
+                    <span className="material-symbols-outlined text-[20px]">how_to_reg</span>
+                    <span>Daily Roll Call</span>
+                  </a>
+                  <a className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface text-sm transition-colors" href="#">
+                    <span className="material-symbols-outlined text-[20px]">folder_supervised</span>
+                    <span>Pastoral Care Notes</span>
+                  </a>
+                  <a className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface text-sm transition-colors" href="#">
+                    <span className="material-symbols-outlined text-[20px]">assignment</span>
+                    <span>Subject CA Tracking</span>
+                  </a>
+                  <a className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface text-sm transition-colors" href="#">
+                    <span className="material-symbols-outlined text-[20px]">menu_book</span>
+                    <span>NERDC Scheme Monitor</span>
+                  </a>
+                  <a className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface text-sm transition-colors" href="#">
+                    <span className="material-symbols-outlined text-[20px]">emoji_events</span>
+                    <span>Class Achievements</span>
+                  </a>
+                  <a className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface text-sm transition-colors" href="#">
+                    <span className="material-symbols-outlined text-[20px]">groups</span>
+                    <span>Parent Communication</span>
+                  </a>
+                  <a className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface text-sm transition-colors" href="#">
+                    <span className="material-symbols-outlined text-[20px]">qr_code_scanner</span>
+                    <span>QR Dismissal Gate</span>
+                  </a>
+                </nav>
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 flex flex-col gap-2 bg-surface-container-lowest">
+                <div className="p-2 rounded-xl bg-surface-container-low flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-secondary animate-pulse"></div>
+                    <div className="flex flex-col">
+                      <span className="text-[11px] text-on-surface font-medium">LAG-NODE-03</span>
+                      <span className="text-[10px] text-on-surface-variant">Homeroom Sync</span>
+                    </div>
+                  </div>
+                  <span className="material-symbols-outlined text-secondary text-[18px]">verified</span>
+                </div>
+                <div className="flex items-center justify-between px-1 text-on-surface-variant">
+                  <span className="text-[10px]">EduManage NG v4.2.1</span>
+                  <span className="text-[10px]">TRCN Certified</span>
+                </div>
+              </div>
+            </>
+          ) : user?.roleName?.toUpperCase() === 'HEAD_TEACHER' || user?.roleName?.toUpperCase() === 'PRINCIPAL' || user?.roleName?.toUpperCase() === 'TEACHER' ? (
+            /* Academic Leadership Sidebar (Head Teacher, Principal & Subject Teacher) */
             <>
               <div className="flex flex-col">
                 {/* Header with Logo and Version */}

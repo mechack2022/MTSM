@@ -55,6 +55,11 @@ import StaffOnboardingPage from '@/pages/staff-onboarding'
 import StaffOnboardingSuccessPage from '@/pages/staff-onboarding-success'
 import CompositeCampusDashboard from '@/pages/composite-campus-dashboard'
 import HeadTeacherDashboard from '@/pages/head-teacher-dashboard'
+import SchoolAdminStaffDirectoryPage from '@/pages/school-admin-staff-directory'
+import AddStaffPage from '@/pages/add-staff'
+import EditStaffPage from '@/pages/edit-staff'
+import AddStaffSuccessPage from '@/pages/add-staff-success'
+import EmploymentAssignmentsPage from '@/pages/employment-assignments'
 
 // ============================================================================
 // PROTECTED ROUTE COMPONENT
@@ -365,6 +370,46 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <StaffOnboardingSuccessPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/staff-directory"
+        element={
+          <ProtectedRoute>
+            <SchoolAdminStaffDirectoryPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/add-staff"
+        element={
+          <ProtectedRoute>
+            <AddStaffPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/edit-staff/:staffId"
+        element={
+          <ProtectedRoute>
+            <EditStaffPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/add-staff-success"
+        element={
+          <ProtectedRoute>
+            <AddStaffSuccessPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/employment-assignments"
+        element={
+          <ProtectedRoute>
+            <EmploymentAssignmentsPage />
           </ProtectedRoute>
         }
       />

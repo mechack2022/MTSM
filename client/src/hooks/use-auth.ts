@@ -31,12 +31,17 @@ import type { LoginRequest, LoginResponse } from '@/types'
 //    Password: admin123
 //    Access: Manage specific school
 //
-// 4. HEAD TEACHER (School level)
+// 4. PRINCIPAL (Secondary School level)
+//    Username: principal
+//    Password: admin123
+//    Access: JSS & SSS oversight, specialist faculty
+//
+// 5. HEAD TEACHER (School level)
 //    Username: headteacher
 //    Password: admin123
 //    Access: Academic management
 //
-// 5. TEACHER (Classroom level)
+// 6. TEACHER (Classroom level)
 //    Username: teacher
 //    Password: admin123
 //    Access: Classes, attendance, grading
@@ -71,9 +76,18 @@ const DUMMY_USERS = {
     tenantId: 'tenant-001',
     schoolId: 'school-001',
   },
-  'headteacher': {
+  'principal': {
     password: 'admin123',
     userId: '4',
+    username: 'Principal Okafor',
+    role: 'PRINCIPAL',
+    token: 'dummy-token-principal',
+    tenantId: 'tenant-001',
+    schoolId: 'school-001',
+  },
+  'headteacher': {
+    password: 'admin123',
+    userId: '5',
     username: 'Mr. Chukwuma Okonkwo',
     role: 'HEAD_TEACHER',
     token: 'dummy-token-headteacher',
@@ -82,10 +96,19 @@ const DUMMY_USERS = {
   },
   'teacher': {
     password: 'admin123',
-    userId: '5',
+    userId: '6',
     username: 'Ms. Aisha Mohammed',
     role: 'TEACHER',
     token: 'dummy-token-teacher',
+    tenantId: 'tenant-001',
+    schoolId: 'school-001',
+  },
+  'classteacher': {
+    password: 'admin123',
+    userId: '7',
+    username: 'Mrs. Patience Okon',
+    role: 'CLASS_TEACHER',
+    token: 'dummy-token-classteacher',
     tenantId: 'tenant-001',
     schoolId: 'school-001',
   },

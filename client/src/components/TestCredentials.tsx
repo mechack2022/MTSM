@@ -36,6 +36,13 @@ const TEST_ACCOUNTS: TestAccount[] = [
     color: 'bg-cyan-100 text-cyan-800 border-cyan-300',
   },
   {
+    role: 'Principal',
+    username: 'principal',
+    password: 'admin123',
+    description: 'JSS & SSS oversight, specialist faculty',
+    color: 'bg-indigo-100 text-indigo-800 border-indigo-300',
+  },
+  {
     role: 'Head Teacher',
     username: 'headteacher',
     password: 'admin123',
@@ -48,6 +55,13 @@ const TEST_ACCOUNTS: TestAccount[] = [
     password: 'admin123',
     description: 'Classes, attendance, grading',
     color: 'bg-amber-100 text-amber-800 border-amber-300',
+  },
+  {
+    role: 'Class Teacher',
+    username: 'classteacher',
+    password: 'admin123',
+    description: 'Homeroom tutor, one class, multiple subjects',
+    color: 'bg-rose-100 text-rose-800 border-rose-300',
   },
 ]
 

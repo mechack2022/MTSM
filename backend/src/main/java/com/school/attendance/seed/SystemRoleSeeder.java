@@ -23,6 +23,7 @@ public class SystemRoleSeeder implements CommandLineRunner {
     public static final String SUPER_ADMIN = "SUPER_ADMIN";
     public static final String TENANT_ADMIN = "TENANT_ADMIN";
     public static final String SCHOOL_ADMIN = "SCHOOL_ADMIN";
+    public static final String PRINCIPAL = "PRINCIPAL";
     public static final String HEAD_TEACHER = "HEAD_TEACHER";
     public static final String TEACHER = "TEACHER";
 

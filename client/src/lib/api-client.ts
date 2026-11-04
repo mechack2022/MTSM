@@ -130,10 +130,8 @@ apiClient.interceptors.response.use(
     // Handle HTTP error responses
     switch (response.status) {
       case 401:
-        // Unauthorized - clear auth and redirect to login
-        // TEMPORARILY DISABLED FOR TESTING WITHOUT BACKEND
-        // handleUnauthorized()
-        console.warn('[API] 401 Unauthorized - Auth clearing disabled for testing')
+        // Unauthorized - refresh token or redirect to login
+        handleUnauthorized()
         return Promise.reject(
           response.data?.error ||
             createApiError('UNAUTHORIZED', 'Authentication required')
@@ -203,13 +201,38 @@ function createApiError(code: string, message: string): ApiError {
   }
 }
 
-function handleUnauthorized() {
-  // Clear authentication
+async function handleUnauthorized() {
+  // Try to refresh token with Keycloak
+  try {
+    const keycloak = (await import('./keycloak')).default
+    const refreshed = await keycloak.updateToken(30)
+
+    if (refreshed && keycloak.token) {
+      const currentState = useAppStore.getState()
+      if (currentState.user) {
+        useAppStore.getState().setAuth({
+          ...currentState,
+          token: keycloak.token,
+        })
+      }
+      return
+    }
+  } catch (error) {
+    console.error('Token refresh failed:', error)
+  }
+
+  // Clear authentication and redirect
   useAppStore.getState().clearAuth()
 
-  // Redirect to login (if not already there)
-  if (window.location.pathname !== '/login') {
-    window.location.href = '/login'
+  // Use Keycloak login
+  try {
+    const keycloak = (await import('./keycloak')).default
+    keycloak.login()
+  } catch {
+    // Fallback to app login page
+    if (window.location.pathname !== '/') {
+      window.location.href = '/'
+    }
   }
 }
 

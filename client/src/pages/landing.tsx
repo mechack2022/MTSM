@@ -1,20 +1,34 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLogin } from '@/hooks'
+import { useAuth } from '@/store'
 import toast from 'react-hot-toast'
-import TestCredentials from '@/components/TestCredentials'
-import DebugAuthButton from '@/components/DebugAuthButton'
 
 export default function LandingPage() {
   const navigate = useNavigate()
   const login = useLogin()
+  const { user, token } = useAuth()
 
   const [roleTab, setRoleTab] = useState<'staff' | 'parent'>('staff')
   const [schoolCode, setSchoolCode] = useState('corona-lagos')
-  const [userIdentifier, setUserIdentifier] = useState('superadmin')
-  const [password, setPassword] = useState('admin123')
+  const [userIdentifier, setUserIdentifier] = useState('platform.admin@mtsms.local')
+  const [password, setPassword] = useState('Admin@123456')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoggingIn, setIsLoggingIn] = useState(false)
+
+  // Redirect authenticated users to their dashboard
+  useEffect(() => {
+    if (user && token) {
+      console.log('Landing page: User is authenticated, redirecting...', user.roleName)
+      if (user.roleName === 'PLATFORM_ADMIN') {
+        navigate('/tenants', { replace: true })
+      } else if (user.roleName === 'TENANT_ADMIN') {
+        navigate('/tenant-admin/dashboard', { replace: true })
+      } else {
+        navigate('/dashboard', { replace: true })
+      }
+    }
+  }, [user, token, navigate])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,25 +58,12 @@ export default function LandingPage() {
   const handleFillDemo = () => {
     setRoleTab('staff')
     setSchoolCode('corona-lagos')
-    setUserIdentifier('superadmin')
-    setPassword('admin123')
-  }
-
-  const handleSelectCredentials = (username: string, password: string) => {
-    setUserIdentifier(username)
-    setPassword(password)
-    setSchoolCode('corona-lagos')
-    setRoleTab('staff')
-    toast.success(`Filled credentials for ${username}`)
+    setUserIdentifier('platform.admin@mtsms.local')
+    setPassword('Admin@123456')
   }
 
   const handleRoleChange = (role: 'staff' | 'parent') => {
     setRoleTab(role)
-    if (role === 'staff') {
-      setUserIdentifier('superadmin')
-    } else {
-      setUserIdentifier('08032457891')
-    }
   }
 
   return (
@@ -297,7 +298,7 @@ export default function LandingPage() {
                     <div className="flex items-center gap-2">
                       <span className="material-symbols-outlined text-[18px] text-blue-600">info</span>
                       <span className="text-xs">
-                        Quick Demo: <strong className="text-xs text-blue-600">admin@demo.edumanage.ng</strong>
+                        Quick Demo: <strong className="text-xs text-blue-600">platform.admin@mtsms.local</strong>
                       </span>
                     </div>
                     <button
@@ -576,12 +577,6 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
-
-      {/* Test Credentials Panel */}
-      <TestCredentials onSelectCredentials={handleSelectCredentials} />
-
-      {/* Debug Auth Button - REMOVE AFTER TESTING */}
-      <DebugAuthButton />
     </div>
   )
 }

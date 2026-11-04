@@ -1,5 +1,6 @@
 # Environment & Secrets
 .env
+.env.local
 *.pem
 *.key
 credentials.json
@@ -16,9 +17,18 @@ backend/.settings/
 backend/.classpath
 backend/.project
 backend/bin/
-*.md
 #backend/mvnw
 #backend/mvnw.cmd
+
+# Documentation - ignore temporary setup notes but keep important docs
+KEYCLOAK_SETUP_COMPLETE.md
+MAILPIT_SETUP.md
+DOCKER_SETUP.md
+*_SETUP.md
+TEST_ACCOUNTS.md
+
+# Scripts
+*.sh
 
 # Client (Node)
 client/node_modules/
@@ -43,6 +53,9 @@ Thumbs.db
 # Docker
 *.log
 db_data/
+backend/pgadmin/
+backend/postgres/
+backend/keycloak/
 
 # Testing
 *.test.log

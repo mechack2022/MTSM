@@ -11,110 +11,6 @@ import { invalidateQueries } from '@/lib/query-client'
 import type { LoginRequest, LoginResponse } from '@/types'
 
 // ============================================================================
-// DUMMY CREDENTIALS FOR TESTING (Remove when connecting to backend)
-// ============================================================================
-//
-// TEST ACCOUNTS - Use these credentials to test different user flows:
-//
-// 1. SUPER ADMIN (Platform-wide access)
-//    Username: superadmin
-//    Password: admin123
-//    Access: Manage all tenants, system settings
-//
-// 2. TENANT ADMIN (Organization/District level)
-//    Username: tenantadmin
-//    Password: admin123
-//    Access: Manage schools within tenant
-//
-// 3. SCHOOL ADMIN (School level)
-//    Username: schooladmin
-//    Password: admin123
-//    Access: Manage specific school
-//
-// 4. PRINCIPAL (Secondary School level)
-//    Username: principal
-//    Password: admin123
-//    Access: JSS & SSS oversight, specialist faculty
-//
-// 5. HEAD TEACHER (School level)
-//    Username: headteacher
-//    Password: admin123
-//    Access: Academic management
-//
-// 6. TEACHER (Classroom level)
-//    Username: teacher
-//    Password: admin123
-//    Access: Classes, attendance, grading
-//
-// ============================================================================
-
-const DUMMY_USERS = {
-  'superadmin': {
-    password: 'admin123',
-    userId: '1',
-    username: 'Dr. Farouk Bello',
-    role: 'PLATFORM_ADMIN',
-    token: 'dummy-token-superadmin',
-    tenantId: null,
-    schoolId: null,
-  },
-  'tenantadmin': {
-    password: 'admin123',
-    userId: '2',
-    username: 'Chief Dr. Adebayo Adeleke',
-    role: 'TENANT_ADMIN',
-    token: 'dummy-token-tenantadmin',
-    tenantId: 'tenant-001',
-    schoolId: null,
-  },
-  'schooladmin': {
-    password: 'admin123',
-    userId: '3',
-    username: 'Mrs. Folashade Adeleke',
-    role: 'SCHOOL_ADMIN',
-    token: 'dummy-token-schooladmin',
-    tenantId: 'tenant-001',
-    schoolId: 'school-001',
-  },
-  'principal': {
-    password: 'admin123',
-    userId: '4',
-    username: 'Principal Okafor',
-    role: 'PRINCIPAL',
-    token: 'dummy-token-principal',
-    tenantId: 'tenant-001',
-    schoolId: 'school-001',
-  },
-  'headteacher': {
-    password: 'admin123',
-    userId: '5',
-    username: 'Mr. Chukwuma Okonkwo',
-    role: 'HEAD_TEACHER',
-    token: 'dummy-token-headteacher',
-    tenantId: 'tenant-001',
-    schoolId: 'school-001',
-  },
-  'teacher': {
-    password: 'admin123',
-    userId: '6',
-    username: 'Ms. Aisha Mohammed',
-    role: 'TEACHER',
-    token: 'dummy-token-teacher',
-    tenantId: 'tenant-001',
-    schoolId: 'school-001',
-  },
-  'classteacher': {
-    password: 'admin123',
-    userId: '7',
-    username: 'Mrs. Patience Okon',
-    role: 'CLASS_TEACHER',
-    token: 'dummy-token-classteacher',
-    tenantId: 'tenant-001',
-    schoolId: 'school-001',
-  },
-}
-
-// ============================================================================
 // LOGIN
 // ============================================================================
 
@@ -124,27 +20,61 @@ export function useLogin() {
 
   return useMutation({
     mutationFn: async (credentials: LoginRequest) => {
-      // DUMMY LOGIN - Replace with real API call when connecting to backend
-      await new Promise(resolve => setTimeout(resolve, 800)) // Simulate network delay
+      // Use Direct Access Grants (Resource Owner Password Credentials)
+      const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8080'
+      const realm = import.meta.env.VITE_KEYCLOAK_REALM || 'MTSMS'
+      const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'mtsms-frontend'
 
-      const user = DUMMY_USERS[credentials.username.toLowerCase() as keyof typeof DUMMY_USERS]
+      const tokenEndpoint = `${keycloakUrl}/realms/${realm}/protocol/openid-connect/token`
 
-      if (!user || user.password !== credentials.password) {
-        throw new Error('Invalid username or password')
+      const body = new URLSearchParams({
+        grant_type: 'password',
+        client_id: clientId,
+        username: credentials.username,
+        password: credentials.password,
+      })
+
+      const response = await fetch(tokenEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: body.toString(),
+      })
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Invalid credentials' }))
+        throw new Error(error.error_description || error.error || 'Login failed')
       }
 
-      return {
-        userId: user.userId,
-        username: user.username,
-        role: user.role,
-        token: user.token,
-        tenantId: user.tenantId,
-        schoolId: user.schoolId,
-      } as LoginResponse
+      const tokens = await response.json()
 
-      // REAL LOGIN (commented out for now)
-      // const response = await api.post<LoginResponse>('/auth/login', credentials)
-      // return response.data!
+      // Decode JWT to get user info
+      const tokenParts = tokens.access_token.split('.')
+      const tokenParsed = JSON.parse(atob(tokenParts[1]))
+
+      // Extract role
+      const roles = tokenParsed.realm_access?.roles || []
+      let role = 'USER'
+      if (roles.includes('platform_admin')) role = 'PLATFORM_ADMIN'
+      else if (roles.includes('tenant_admin')) role = 'TENANT_ADMIN'
+      else if (roles.includes('school_admin')) role = 'SCHOOL_ADMIN'
+      else if (roles.includes('principal')) role = 'PRINCIPAL'
+      else if (roles.includes('head_teacher')) role = 'HEAD_TEACHER'
+      else if (roles.includes('class_teacher')) role = 'CLASS_TEACHER'
+      else if (roles.includes('subject_teacher')) role = 'SUBJECT_TEACHER'
+      else if (roles.includes('teacher')) role = 'TEACHER'
+
+      return {
+        userId: tokenParsed.sub,
+        username: tokenParsed.preferred_username || tokenParsed.email,
+        fullName: `${tokenParsed.given_name || ''} ${tokenParsed.family_name || ''}`.trim() || tokenParsed.preferred_username,
+        role,
+        token: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        tenantId: tokenParsed.tenant_id || null,
+        schoolId: tokenParsed.school_id || null,
+      }
     },
 
     onSuccess: (data) => {
@@ -155,7 +85,7 @@ export function useLogin() {
         id: data.userId,
         tenantId: data.tenantId || '',
         username: data.username,
-        fullName: data.username,
+        fullName: data.fullName,
         roleId: data.role,
         roleName: data.role,
         isActive: true,
@@ -170,32 +100,24 @@ export function useLogin() {
       setAuth({
         user,
         token: data.token,
+        refreshToken: data.refreshToken,
         tenant: null,
         assignedSchools: [],
       })
 
-      console.log('useLogin.onSuccess: Auth state saved to store')
-
-      // Verify the state was actually saved
-      const currentState = useAppStore.getState()
-      console.log('useLogin.onSuccess: Current store state:', {
-        hasUser: !!currentState.user,
-        hasToken: !!currentState.token,
-        userName: currentState.user?.fullName
+      // Also update Keycloak instance with the token (for compatibility with other parts)
+      import('@/lib/keycloak').then(({ default: keycloak }) => {
+        keycloak.token = data.token
+        keycloak.refreshToken = data.refreshToken
+        keycloak.authenticated = true
       })
 
-      toast.success(`Welcome back, ${data.username}!`)
+      console.log('useLogin.onSuccess: Auth state saved to store')
 
-      // Route to appropriate dashboard based on role with a delay to ensure state is persisted to localStorage
+      toast.success(`Welcome back, ${data.fullName || data.username}!`)
+
+      // Route to appropriate dashboard based on role
       setTimeout(() => {
-        // Double-check the state before navigating
-        const finalState = useAppStore.getState()
-        console.log('useLogin.onSuccess: State before navigation:', {
-          hasUser: !!finalState.user,
-          hasToken: !!finalState.token,
-          userName: finalState.user?.fullName
-        })
-
         if (data.role === 'PLATFORM_ADMIN') {
           console.log('useLogin.onSuccess: Navigating PLATFORM_ADMIN to /tenants')
           navigate('/tenants', { replace: true })
@@ -225,8 +147,38 @@ export function useLogout() {
 
   return useMutation({
     mutationFn: async () => {
-      // Optional: call logout endpoint if you have one
-      // await api.post('/auth/logout')
+      // For Direct Access Grants, we just need to clear local state
+      // Optionally, we could call Keycloak's logout endpoint if needed
+      const { refreshToken } = useAppStore.getState()
+
+      if (refreshToken) {
+        try {
+          const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8080'
+          const realm = import.meta.env.VITE_KEYCLOAK_REALM || 'MTSMS'
+          const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'mtsms-frontend'
+
+          // Call Keycloak logout endpoint
+          const logoutEndpoint = `${keycloakUrl}/realms/${realm}/protocol/openid-connect/logout`
+
+          const body = new URLSearchParams({
+            client_id: clientId,
+            refresh_token: refreshToken,
+          })
+
+          await fetch(logoutEndpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: body.toString(),
+          }).catch(() => {
+            // Ignore errors, we'll clear local state anyway
+          })
+        } catch (error) {
+          console.log('Keycloak logout call failed, clearing local state anyway')
+        }
+      }
+
       return true
     },
 
@@ -237,10 +189,10 @@ export function useLogout() {
       // Clear auth state
       clearAuth()
 
-      toast.success('Logged out successfully')
+      // Navigate to landing page
+      navigate('/', { replace: true })
 
-      // Navigate to landing page (login page is at '/')
-      navigate('/')
+      toast.success('Logged out successfully')
     },
   })
 }

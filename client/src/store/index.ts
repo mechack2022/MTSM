@@ -27,12 +27,14 @@ interface AppStore {
   // ==================== AUTHENTICATION ====================
   user: User | null
   token: string | null
+  refreshToken: string | null
   tenant: Tenant | null
   assignedSchools: School[]
 
   setAuth: (data: {
     user: User
     token: string
+    refreshToken?: string
     tenant: Tenant | null
     assignedSchools: School[]
   }) => void
@@ -86,10 +88,11 @@ export const useAppStore = create<AppStore>()(
       // ==================== AUTHENTICATION STATE ====================
       user: null,
       token: null,
+      refreshToken: null,
       tenant: null,
       assignedSchools: [],
 
-      setAuth: ({ user, token, tenant, assignedSchools }) => {
+      setAuth: ({ user, token, refreshToken, tenant, assignedSchools }) => {
         console.log('Store.setAuth called with:', {
           userId: user.id,
           userName: user.fullName,
@@ -99,6 +102,7 @@ export const useAppStore = create<AppStore>()(
         set({
           user,
           token,
+          refreshToken: refreshToken || null,
           tenant,
           assignedSchools,
           selectedSchool: assignedSchools[0] || null,
@@ -110,6 +114,7 @@ export const useAppStore = create<AppStore>()(
         set({
           user: null,
           token: null,
+          refreshToken: null,
           tenant: null,
           assignedSchools: [],
           selectedSchool: null,
@@ -234,6 +239,7 @@ export const useAppStore = create<AppStore>()(
       partialize: (state) => ({
         user: state.user,
         token: state.token,
+        refreshToken: state.refreshToken,
         tenant: state.tenant,
         assignedSchools: state.assignedSchools,
         selectedSchool: state.selectedSchool,

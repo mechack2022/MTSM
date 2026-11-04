@@ -18,6 +18,7 @@ import { Toaster } from 'react-hot-toast'
 import { queryClient } from '@/lib/query-client'
 import { useSyncManager, NetworkStatusIndicator } from '@/lib/sync-manager'
 import { useAuth } from '@/store'
+import { KeycloakProvider } from '@/lib/keycloak-provider'
 
 // ============================================================================
 // PAGES (Placeholder imports - to be created)
@@ -108,7 +109,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>{children}</BrowserRouter>
+      <BrowserRouter>
+        <KeycloakProvider>{children}</KeycloakProvider>
+      </BrowserRouter>
 
       {/* React Query DevTools (only in development) */}
       {import.meta.env.DEV && (

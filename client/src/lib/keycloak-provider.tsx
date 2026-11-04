@@ -1,5 +1,5 @@
-import { ReactNode, useEffect, useState, useRef } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { ReactNode, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import keycloak from './keycloak'
 import { useAppStore } from '@/store'
 
@@ -9,18 +9,68 @@ interface KeycloakProviderProps {
 
 export function KeycloakProvider({ children }: KeycloakProviderProps) {
   const [initialized, setInitialized] = useState(false)
-  const hasNavigated = useRef(false)
   const navigate = useNavigate()
-  const location = useLocation()
   const setAuth = useAppStore((state) => state.setAuth)
   const clearAuth = useAppStore((state) => state.clearAuth)
 
   useEffect(() => {
-    // Just initialize Keycloak without auto-login
-    // We'll use Direct Access Grants for login instead
-    setInitialized(true)
-    console.log('Keycloak provider initialized (passive mode)')
+    // Initialize Keycloak with Authorization Code + PKCE flow
+    keycloak
+      .init({
+        onLoad: 'check-sso',
+        silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
+        pkceMethod: 'S256',
+        checkLoginIframe: false,
+      })
+      .then((authenticated) => {
+        console.log('Keycloak initialized:', { authenticated })
+        setInitialized(true)
 
+        if (authenticated && keycloak.token && keycloak.tokenParsed) {
+          // User is already authenticated (SSO or returning user)
+          const tokenParsed = keycloak.tokenParsed
+          const roles = tokenParsed.realm_access?.roles || []
+
+          let role = 'USER'
+          if (roles.includes('platform_admin')) role = 'PLATFORM_ADMIN'
+          else if (roles.includes('tenant_admin')) role = 'TENANT_ADMIN'
+          else if (roles.includes('school_admin')) role = 'SCHOOL_ADMIN'
+          else if (roles.includes('principal')) role = 'PRINCIPAL'
+          else if (roles.includes('head_teacher')) role = 'HEAD_TEACHER'
+          else if (roles.includes('class_teacher')) role = 'CLASS_TEACHER'
+          else if (roles.includes('subject_teacher')) role = 'SUBJECT_TEACHER'
+          else if (roles.includes('teacher')) role = 'TEACHER'
+
+          const user = {
+            id: tokenParsed.sub || '',
+            tenantId: tokenParsed.tenant_id || '',
+            username: tokenParsed.preferred_username || tokenParsed.email || '',
+            fullName: `${tokenParsed.given_name || ''} ${tokenParsed.family_name || ''}`.trim() || tokenParsed.preferred_username || '',
+            roleId: role,
+            roleName: role,
+            isActive: true,
+            isPlatformAdmin: role === 'PLATFORM_ADMIN',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }
+
+          setAuth({
+            user,
+            token: keycloak.token,
+            refreshToken: keycloak.refreshToken,
+            tenant: null,
+            assignedSchools: [],
+          })
+
+          console.log('User authenticated via SSO:', user)
+        }
+      })
+      .catch((error) => {
+        console.error('Keycloak initialization failed:', error)
+        setInitialized(true)
+      })
+
+    // Token refresh handler
     keycloak.onTokenExpired = () => {
       console.log('Token expired, refreshing...')
       keycloak
@@ -33,6 +83,7 @@ export function KeycloakProvider({ children }: KeycloakProviderProps) {
               setAuth({
                 ...currentState,
                 token: keycloak.token,
+                refreshToken: keycloak.refreshToken,
               })
             }
           }
@@ -40,16 +91,17 @@ export function KeycloakProvider({ children }: KeycloakProviderProps) {
         .catch(() => {
           console.error('Token refresh failed')
           clearAuth()
-          keycloak.login()
+          navigate('/', { replace: true })
         })
     }
 
     keycloak.onAuthLogout = () => {
       console.log('User logged out')
       clearAuth()
+      navigate('/', { replace: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setAuth, clearAuth])
+  }, [])
 
   if (!initialized) {
     return (

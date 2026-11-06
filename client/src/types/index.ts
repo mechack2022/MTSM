@@ -24,27 +24,71 @@ export interface ApiError {
 
 export interface Tenant {
   id: string
-  name: string
   code: string
-  contactEmail: string | null
-  contactPhone: string | null
-  isActive: boolean
+  name: string
+  cacNumber?: string | null
+  subdomain?: string | null
+  state?: string | null
+  address?: string | null
+  contactName?: string | null
+  roleTitle?: string | null
+  contactEmail: string
+  contactPhone?: string | null
+  status: 'ACTIVE' | 'SUSPENDED' | 'INACTIVE'
+  subscriptionTier?: 'BASIC' | 'STANDARD' | 'ENTERPRISE' | null
+  studentQuota?: number | null
+  billingCycle?: 'ANNUAL' | 'TERMLY' | 'BIANNUAL' | null
+  subscriptionStartDate?: string | null
+  subscriptionEndDate?: string | null
+  metadata?: string | null
   createdAt: string
-  createdBy: string | null
   updatedAt: string
-  updatedBy: string | null
 }
 
 export interface CreateTenantRequest {
+  code: string
   name: string
-  contactEmail?: string | null
+  cacNumber?: string | null
+  subdomain?: string | null
+  state?: string | null
+  address?: string | null
+  contactName?: string | null
+  roleTitle?: string | null
+  contactEmail: string
   contactPhone?: string | null
+  subscriptionTier?: 'BASIC' | 'STANDARD' | 'ENTERPRISE' | null
+  studentQuota?: number | null
+  billingCycle?: 'ANNUAL' | 'TERMLY' | 'BIANNUAL' | null
+  subscriptionStartDate?: string | null
+  subscriptionEndDate?: string | null
+  metadata?: string | null
 }
 
 export interface UpdateTenantRequest {
-  name: string
-  contactEmail?: string | null
+  name?: string
+  state?: string | null
+  address?: string | null
+  contactName?: string | null
+  roleTitle?: string | null
+  contactEmail?: string
   contactPhone?: string | null
+  status?: 'ACTIVE' | 'SUSPENDED' | 'INACTIVE'
+  subscriptionTier?: 'BASIC' | 'STANDARD' | 'ENTERPRISE' | null
+  studentQuota?: number | null
+  billingCycle?: 'ANNUAL' | 'TERMLY' | 'BIANNUAL' | null
+  subscriptionStartDate?: string | null
+  subscriptionEndDate?: string | null
+  metadata?: string | null
+}
+
+export interface CreateTenantResponse {
+  tenant: Tenant
+  adminCredentials: {
+    adminName: string
+    adminEmail: string
+    tempPassword: string
+    portalUrl: string
+  }
 }
 
 export interface School {

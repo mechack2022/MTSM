@@ -248,6 +248,18 @@ export const useAppStore = create<AppStore>()(
         lastSyncTime: state.lastSyncTime,
       }),
 
+      // Merge persisted state with default state to ensure all properties exist
+      merge: (persistedState, currentState) => {
+        return {
+          ...currentState,
+          ...(persistedState as Partial<AppStore>),
+          // Ensure offlineQueue is always an array
+          offlineQueue: (persistedState as any)?.offlineQueue || [],
+          // Ensure assignedSchools is always an array
+          assignedSchools: (persistedState as any)?.assignedSchools || [],
+        }
+      },
+
       // Add debugging
       onRehydrateStorage: () => {
         console.log('Store: Starting rehydration from localStorage')

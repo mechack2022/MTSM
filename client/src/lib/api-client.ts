@@ -264,31 +264,31 @@ async function retryRequest(config: AxiosRequestConfig): Promise<any> {
 // ============================================================================
 // TYPED API METHODS
 // ============================================================================
-
+// Note: Backend returns data directly without ApiResponse wrapper
 export const api = {
   // GET request
   get: <T = any>(url: string, config?: AxiosRequestConfig) => {
-    return apiClient.get<ApiResponse<T>>(url, config).then((res) => res.data)
+    return apiClient.get<T>(url, config).then((res) => ({ data: res.data }))
   },
 
   // POST request
   post: <T = any>(url: string, data?: any, config?: AxiosRequestConfig) => {
-    return apiClient.post<ApiResponse<T>>(url, data, config).then((res) => res.data)
+    return apiClient.post<T>(url, data, config).then((res) => ({ data: res.data }))
   },
 
   // PUT request
   put: <T = any>(url: string, data?: any, config?: AxiosRequestConfig) => {
-    return apiClient.put<ApiResponse<T>>(url, data, config).then((res) => res.data)
+    return apiClient.put<T>(url, data, config).then((res) => ({ data: res.data }))
   },
 
   // PATCH request
   patch: <T = any>(url: string, data?: any, config?: AxiosRequestConfig) => {
-    return apiClient.patch<ApiResponse<T>>(url, data, config).then((res) => res.data)
+    return apiClient.patch<T>(url, data, config).then((res) => ({ data: res.data }))
   },
 
   // DELETE request
   delete: <T = any>(url: string, config?: AxiosRequestConfig) => {
-    return apiClient.delete<ApiResponse<T>>(url, config).then((res) => res.data)
+    return apiClient.delete<T>(url, config).then((res) => ({ data: res.data }))
   },
 }
 

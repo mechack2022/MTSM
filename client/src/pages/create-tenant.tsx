@@ -5,6 +5,24 @@
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useCreateTenant } from '@/hooks/use-tenants'
+import type { CreateTenantResponse } from '@/types'
+
+// ============================================================================
+// ERROR MESSAGE COMPONENT
+// ============================================================================
+
+const ErrorMessage = ({ message }: { message?: string }) => {
+  if (!message) return null
+  return (
+    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+      </svg>
+      {message}
+    </p>
+  )
+}
 
 // ============================================================================
 // COMPONENT
@@ -12,36 +30,29 @@ import { useNavigate } from 'react-router-dom'
 
 export default function CreateTenantPage() {
   const navigate = useNavigate()
+  const createTenantMutation = useCreateTenant()
 
-  // Form state
   const [tenantName, setTenantName] = useState('')
   const [shortCode, setShortCode] = useState('')
   const [cacNumber, setCacNumber] = useState('')
   const [subdomain, setSubdomain] = useState('crownjewel')
-  const [state, setState] = useState('lagos')
+  const [state, setState] = useState('')
   const [physicalAddress, setPhysicalAddress] = useState('')
   const [contactName, setContactName] = useState('')
   const [roleTitle, setRoleTitle] = useState('')
   const [contactEmail, setContactEmail] = useState('')
   const [contactPhone, setContactPhone] = useState('')
-  const [subscriptionTier, setSubscriptionTier] = useState('standard')
+  const [subscriptionTier, setSubscriptionTier] = useState('STANDARD')
   const [studentQuota, setStudentQuota] = useState(1500)
-  const [billingCycle, setBillingCycle] = useState('annual')
+  const [billingCycle, setBillingCycle] = useState('ANNUAL')
 
-  // UI state
   const [subdomainTouched, setSubdomainTouched] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isSuccess, setIsSuccess] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [copiedField, setCopiedField] = useState<string | null>(null)
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // Generated credentials (would come from API response)
-  const [generatedCredentials, setGeneratedCredentials] = useState({
-    adminName: '',
-    adminEmail: '',
-    tempPassword: '',
-    portalUrl: '',
-  })
+  // Use the mutation's data property directly
+  const createdTenantData = createTenantMutation.data
 
   // Auto-generate subdomain from tenant name
   useEffect(() => {
@@ -57,12 +68,27 @@ export default function CreateTenantPage() {
   const handleSubdomainChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')
     setSubdomain(val)
+    // Clear error when user types
+    if (errors.subdomain) {
+      setErrors(prev => ({ ...prev, subdomain: '' }))
+    }
   }
 
   // Handle short code input
   const handleShortCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.toUpperCase()
     setShortCode(val)
+    // Clear error when user types
+    if (errors.shortCode) {
+      setErrors(prev => ({ ...prev, shortCode: '' }))
+    }
+  }
+
+  // Helper function to clear field error
+  const clearError = (fieldName: string) => {
+    if (errors[fieldName]) {
+      setErrors(prev => ({ ...prev, [fieldName]: '' }))
+    }
   }
 
   // Check subdomain availability
@@ -75,16 +101,17 @@ export default function CreateTenantPage() {
     setTimeout(() => setCopiedField(null), 2000)
   }
 
-  // WhatsApp share handler
   const handleWhatsAppShare = () => {
+    if (!createdTenantData) return
+
     const message = `🎓 *EduManage Platform Access*
 
-🏫 *Organization:* ${tenantName}
-🌐 *Portal URL:* ${generatedCredentials.portalUrl}
+🏫 *Organization:* ${createdTenantData.tenant.name}
+🌐 *Portal URL:* ${createdTenantData.adminCredentials.portalUrl}
 
-👤 *Administrator:* ${generatedCredentials.adminName}
-📧 *Email/Username:* ${generatedCredentials.adminEmail}
-🔑 *Temporary Password:* ${generatedCredentials.tempPassword}
+👤 *Administrator:* ${createdTenantData.adminCredentials.adminName}
+📧 *Email/Username:* ${createdTenantData.adminCredentials.adminEmail}
+🔑 *Temporary Password:* ${createdTenantData.adminCredentials.tempPassword}
 
 ⚠️ *Security Notice:* This password expires in 48 hours. Please login and change immediately.
 
@@ -94,25 +121,99 @@ Powered by EduManage Nigeria`
     window.open(whatsappUrl, '_blank')
   }
 
-  // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {}
+
+    // Tenant Name
+    if (!tenantName.trim()) {
+      newErrors.tenantName = 'Organization name is required'
+    }
+
+    // Short Code
+    if (!shortCode.trim()) {
+      newErrors.shortCode = 'Organization code is required'
+    } else if (shortCode.length < 2 || shortCode.length > 8) {
+      newErrors.shortCode = 'Code must be between 2-8 characters'
+    }
+
+    // Subdomain
+    if (!subdomain.trim()) {
+      newErrors.subdomain = 'Subdomain is required'
+    } else if (subdomain.length < 3) {
+      newErrors.subdomain = 'Subdomain must be at least 3 characters'
+    }
+
+    // State
+    if (!state) {
+      newErrors.state = 'Please select a state'
+    }
+
+    // Physical Address
+    if (!physicalAddress.trim()) {
+      newErrors.physicalAddress = 'Headquarters address is required'
+    }
+
+    // Contact Name
+    if (!contactName.trim()) {
+      newErrors.contactName = 'Administrator name is required'
+    }
+
+    // Role Title
+    if (!roleTitle.trim()) {
+      newErrors.roleTitle = 'Administrator role title is required'
+    }
+
+    // Contact Email
+    if (!contactEmail.trim()) {
+      newErrors.contactEmail = 'Administrator email is required'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) {
+      newErrors.contactEmail = 'Please enter a valid email address'
+    }
+
+    // Contact Phone
+    if (!contactPhone.trim()) {
+      newErrors.contactPhone = 'Phone number is required'
+    } else if (!/^\d{10,11}$/.test(contactPhone.replace(/\s/g, ''))) {
+      newErrors.contactPhone = 'Please enter a valid Nigerian phone number (10-11 digits)'
+    }
+
+    // Student Quota
+    if (studentQuota < 50) {
+      newErrors.studentQuota = 'Minimum student quota is 50'
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    setIsSubmitting(true)
+    // Clear previous errors
+    setErrors({})
 
-    // Simulate API call
-    setTimeout(() => {
-      // Generate dummy credentials (would come from API response)
-      const tempPassword = `Edu${Math.random().toString(36).substring(2, 10)}#${Math.floor(Math.random() * 100)}`
-      setGeneratedCredentials({
-        adminName: contactName,
-        adminEmail: contactEmail,
-        tempPassword: tempPassword,
-        portalUrl: `https://${subdomain}.edumanage.ng`,
-      })
+    // Validate form
+    if (!validateForm()) {
+      return
+    }
 
-      setIsSuccess(true)
-    }, 1500)
+    const requestData = {
+      code: shortCode,
+      name: tenantName,
+      cacNumber: cacNumber || null,
+      subdomain: subdomain || null,
+      state: state || null,
+      address: physicalAddress || null,
+      contactName: contactName || null,
+      roleTitle: roleTitle || null,
+      contactEmail,
+      contactPhone: contactPhone || null,
+      subscriptionTier: subscriptionTier.toUpperCase() as 'BASIC' | 'STANDARD' | 'ENTERPRISE',
+      studentQuota,
+      billingCycle: billingCycle.toUpperCase() as 'ANNUAL' | 'TERMLY' | 'BIANNUAL',
+    }
+
+    createTenantMutation.mutate(requestData)
   }
 
   return (
@@ -297,15 +398,25 @@ Powered by EduManage Nigeria`
                           Tenant Organization Name <span className="text-red-600">*</span>
                         </label>
                         <input
-                          className="w-full px-4 py-2.5 rounded-lg bg-gray-100 text-gray-900 placeholder:text-gray-500 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                          className={`w-full px-4 py-2.5 rounded-lg text-gray-900 placeholder:text-gray-500 text-sm focus:outline-none focus:ring-2 transition-all ${
+                            errors.tenantName
+                              ? 'bg-red-50 border border-red-300 focus:ring-red-500/20'
+                              : 'bg-gray-100 focus:bg-white focus:ring-blue-500/20'
+                          }`}
                           id="tenantName"
                           placeholder="e.g. Crown Jewel Education Trust"
-                          required
                           type="text"
                           value={tenantName}
-                          onChange={(e) => setTenantName(e.target.value)}
+                          onChange={(e) => {
+                            setTenantName(e.target.value)
+                            clearError('tenantName')
+                          }}
                         />
-                        <span className="text-xs text-gray-500">The legal operating trust or consolidated school board name.</span>
+                        {errors.tenantName ? (
+                          <ErrorMessage message={errors.tenantName} />
+                        ) : (
+                          <span className="text-xs text-gray-500">The legal operating trust or consolidated school board name.</span>
+                        )}
                       </div>
 
                       {/* Short Code */}
@@ -314,16 +425,23 @@ Powered by EduManage Nigeria`
                           Organization Short Code <span className="text-red-600">*</span>
                         </label>
                         <input
-                          className="w-full uppercase px-4 py-2.5 rounded-lg bg-gray-100 text-gray-900 placeholder:text-gray-500 text-sm tracking-wider focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                          className={`w-full uppercase px-4 py-2.5 rounded-lg text-gray-900 placeholder:text-gray-500 text-sm tracking-wider focus:outline-none focus:ring-2 transition-all ${
+                            errors.shortCode
+                              ? 'bg-red-50 border border-red-300 focus:ring-red-500/20'
+                              : 'bg-gray-100 focus:bg-white focus:ring-blue-500/20'
+                          }`}
                           id="shortCode"
                           maxLength={8}
                           placeholder="e.g. CJET"
-                          required
                           type="text"
                           value={shortCode}
                           onChange={handleShortCodeChange}
                         />
-                        <span className="text-xs text-gray-500">2-6 letters used in student IDs & voucher stamps.</span>
+                        {errors.shortCode ? (
+                          <ErrorMessage message={errors.shortCode} />
+                        ) : (
+                          <span className="text-xs text-gray-500">2-6 letters used in student IDs & voucher stamps.</span>
+                        )}
                       </div>
 
                       {/* CAC Number */}
@@ -338,7 +456,10 @@ Powered by EduManage Nigeria`
                           placeholder="e.g. RC-1849204"
                           type="text"
                           value={cacNumber}
-                          onChange={(e) => setCacNumber(e.target.value)}
+                          onChange={(e) => {
+                            setCacNumber(e.target.value)
+                            clearError('cacNumber')
+                          }}
                         />
                         <span className="text-xs text-gray-500">Corporate Affairs Commission accreditation reference.</span>
                       </div>
@@ -348,14 +469,17 @@ Powered by EduManage Nigeria`
                         <label className="text-xs font-semibold text-gray-700" htmlFor="subdomainInput">
                           Platform Subdomain & Routing URL <span className="text-red-600">*</span>
                         </label>
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center bg-gray-100 rounded-lg p-1.5 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
+                        <div className={`flex flex-col sm:flex-row items-stretch sm:items-center rounded-lg p-1.5 transition-all ${
+                          errors.subdomain
+                            ? 'bg-red-50 border border-red-300 focus-within:ring-2 focus-within:ring-red-500/20'
+                            : 'bg-gray-100 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500/20'
+                        }`}>
                           <div className="flex items-center flex-1 px-2.5 py-1">
                             <span className="text-sm text-gray-500 select-none">https://</span>
                             <input
                               className="w-full bg-transparent text-blue-600 text-lg font-semibold px-1.5 focus:outline-none lowercase"
                               id="subdomainInput"
                               placeholder="slug"
-                              required
                               type="text"
                               value={subdomain}
                               onChange={handleSubdomainChange}
@@ -374,7 +498,11 @@ Powered by EduManage Nigeria`
                             </span>
                           </div>
                         </div>
-                        <span className="text-xs text-gray-500">Tenant users will authenticate directly via this enterprise address.</span>
+                        {errors.subdomain ? (
+                          <ErrorMessage message={errors.subdomain} />
+                        ) : (
+                          <span className="text-xs text-gray-500">Tenant users will authenticate directly via this enterprise address.</span>
+                        )}
                       </div>
 
                       {/* State */}
@@ -384,11 +512,17 @@ Powered by EduManage Nigeria`
                         </label>
                         <div className="relative">
                           <select
-                            className="w-full appearance-none px-4 py-2.5 rounded-lg bg-gray-100 text-gray-900 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                            className={`w-full appearance-none px-4 py-2.5 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 transition-all ${
+                              errors.state
+                                ? 'bg-red-50 border border-red-300 focus:ring-red-500/20'
+                                : 'bg-gray-100 focus:bg-white focus:ring-blue-500/20'
+                            }`}
                             id="stateSelect"
-                            required
                             value={state}
-                            onChange={(e) => setState(e.target.value)}
+                            onChange={(e) => {
+                              setState(e.target.value)
+                              clearError('state')
+                            }}
                           >
                             <option value="">Select Federal State...</option>
                             <option value="lagos">Lagos State</option>
@@ -405,6 +539,7 @@ Powered by EduManage Nigeria`
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                           </svg>
                         </div>
+                        {errors.state && <ErrorMessage message={errors.state} />}
                       </div>
 
                       {/* Official Address */}
@@ -413,14 +548,21 @@ Powered by EduManage Nigeria`
                           Official Headquarters Address <span className="text-red-600">*</span>
                         </label>
                         <input
-                          className="w-full px-4 py-2.5 rounded-lg bg-gray-100 text-gray-900 placeholder:text-gray-500 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                          className={`w-full px-4 py-2.5 rounded-lg text-gray-900 placeholder:text-gray-500 text-sm focus:outline-none focus:ring-2 transition-all ${
+                            errors.physicalAddress
+                              ? 'bg-red-50 border border-red-300 focus:ring-red-500/20'
+                              : 'bg-gray-100 focus:bg-white focus:ring-blue-500/20'
+                          }`}
                           id="physicalAddress"
                           placeholder="e.g. 14 Admiralty Way, Lekki Phase 1"
-                          required
                           type="text"
                           value={physicalAddress}
-                          onChange={(e) => setPhysicalAddress(e.target.value)}
+                          onChange={(e) => {
+                            setPhysicalAddress(e.target.value)
+                            clearError('physicalAddress')
+                          }}
                         />
+                        {errors.physicalAddress && <ErrorMessage message={errors.physicalAddress} />}
                       </div>
                     </div>
                   </div>
@@ -449,14 +591,21 @@ Powered by EduManage Nigeria`
                           Primary Contact Full Name <span className="text-red-600">*</span>
                         </label>
                         <input
-                          className="w-full px-4 py-2.5 rounded-lg bg-gray-100 text-gray-900 placeholder:text-gray-500 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                          className={`w-full px-4 py-2.5 rounded-lg text-gray-900 placeholder:text-gray-500 text-sm focus:outline-none focus:ring-2 transition-all ${
+                            errors.contactName
+                              ? 'bg-red-50 border border-red-300 focus:ring-red-500/20'
+                              : 'bg-gray-100 focus:bg-white focus:ring-blue-500/20'
+                          }`}
                           id="contactName"
                           placeholder="e.g. Dr. Aliyu Mohammed"
-                          required
                           type="text"
                           value={contactName}
-                          onChange={(e) => setContactName(e.target.value)}
+                          onChange={(e) => {
+                            setContactName(e.target.value)
+                            clearError('contactName')
+                          }}
                         />
+                        {errors.contactName && <ErrorMessage message={errors.contactName} />}
                       </div>
 
                       {/* Role Title */}
@@ -465,14 +614,21 @@ Powered by EduManage Nigeria`
                           Administrator Role Title <span className="text-red-600">*</span>
                         </label>
                         <input
-                          className="w-full px-4 py-2.5 rounded-lg bg-gray-100 text-gray-900 placeholder:text-gray-500 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                          className={`w-full px-4 py-2.5 rounded-lg text-gray-900 placeholder:text-gray-500 text-sm focus:outline-none focus:ring-2 transition-all ${
+                            errors.roleTitle
+                              ? 'bg-red-50 border border-red-300 focus:ring-red-500/20'
+                              : 'bg-gray-100 focus:bg-white focus:ring-blue-500/20'
+                          }`}
                           id="roleTitle"
                           placeholder="e.g. Managing Director / Lead Proprietor"
-                          required
                           type="text"
                           value={roleTitle}
-                          onChange={(e) => setRoleTitle(e.target.value)}
+                          onChange={(e) => {
+                            setRoleTitle(e.target.value)
+                            clearError('roleTitle')
+                          }}
                         />
+                        {errors.roleTitle && <ErrorMessage message={errors.roleTitle} />}
                       </div>
 
                       {/* Contact Email */}
@@ -485,16 +641,26 @@ Powered by EduManage Nigeria`
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
                           </svg>
                           <input
-                            className="w-full pl-9 pr-4 py-2.5 rounded-lg bg-gray-100 text-gray-900 placeholder:text-gray-500 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                            className={`w-full pl-9 pr-4 py-2.5 rounded-lg text-gray-900 placeholder:text-gray-500 text-sm focus:outline-none focus:ring-2 transition-all ${
+                              errors.contactEmail
+                                ? 'bg-red-50 border border-red-300 focus:ring-red-500/20'
+                                : 'bg-gray-100 focus:bg-white focus:ring-blue-500/20'
+                            }`}
                             id="contactEmail"
                             placeholder="admin@crownjewel-edu.ng"
-                            required
                             type="email"
                             value={contactEmail}
-                            onChange={(e) => setContactEmail(e.target.value)}
+                            onChange={(e) => {
+                              setContactEmail(e.target.value)
+                              clearError('contactEmail')
+                            }}
                           />
                         </div>
-                        <span className="text-xs text-gray-500">Activation handshake & MFA credentials dispatched here.</span>
+                        {errors.contactEmail ? (
+                          <ErrorMessage message={errors.contactEmail} />
+                        ) : (
+                          <span className="text-xs text-gray-500">Activation handshake & MFA credentials dispatched here.</span>
+                        )}
                       </div>
 
                       {/* Contact Phone */}
@@ -505,16 +671,26 @@ Powered by EduManage Nigeria`
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-500 select-none">+234</span>
                           <input
-                            className="w-full pl-14 pr-4 py-2.5 rounded-lg bg-gray-100 text-gray-900 placeholder:text-gray-500 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                            className={`w-full pl-14 pr-4 py-2.5 rounded-lg text-gray-900 placeholder:text-gray-500 text-sm focus:outline-none focus:ring-2 transition-all ${
+                              errors.contactPhone
+                                ? 'bg-red-50 border border-red-300 focus:ring-red-500/20'
+                                : 'bg-gray-100 focus:bg-white focus:ring-blue-500/20'
+                            }`}
                             id="contactPhone"
                             placeholder="803 123 4567"
-                            required
                             type="tel"
                             value={contactPhone}
-                            onChange={(e) => setContactPhone(e.target.value)}
+                            onChange={(e) => {
+                              setContactPhone(e.target.value)
+                              clearError('contactPhone')
+                            }}
                           />
                         </div>
-                        <span className="text-xs text-gray-500">Used for critical SMS alert fallbacks and tier escalations.</span>
+                        {errors.contactPhone ? (
+                          <ErrorMessage message={errors.contactPhone} />
+                        ) : (
+                          <span className="text-xs text-gray-500">Used for critical SMS alert fallbacks and tier escalations.</span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -650,18 +826,28 @@ Powered by EduManage Nigeria`
                         </label>
                         <div className="relative">
                           <input
-                            className="w-full px-4 py-2.5 rounded-lg bg-gray-100 text-gray-900 text-lg font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                            className={`w-full px-4 py-2.5 rounded-lg text-gray-900 text-lg font-semibold focus:outline-none focus:ring-2 transition-all ${
+                              errors.studentQuota
+                                ? 'bg-red-50 border border-red-300 focus:ring-red-500/20'
+                                : 'bg-gray-100 focus:bg-white focus:ring-blue-500/20'
+                            }`}
                             id="studentQuota"
                             min={50}
-                            required
                             step={50}
                             type="number"
                             value={studentQuota}
-                            onChange={(e) => setStudentQuota(parseInt(e.target.value))}
+                            onChange={(e) => {
+                              setStudentQuota(parseInt(e.target.value))
+                              clearError('studentQuota')
+                            }}
                           />
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-500 select-none">Seats</span>
                         </div>
-                        <span className="text-xs text-gray-500">Configurable tenant capacity pool across prospective campuses.</span>
+                        {errors.studentQuota ? (
+                          <ErrorMessage message={errors.studentQuota} />
+                        ) : (
+                          <span className="text-xs text-gray-500">Configurable tenant capacity pool across prospective campuses.</span>
+                        )}
                       </div>
 
                       {/* Billing Cycle */}
@@ -712,19 +898,21 @@ Powered by EduManage Nigeria`
                       </button>
                       <button
                         type="submit"
-                        disabled={isSubmitting || isSuccess}
+                        disabled={createTenantMutation.isPending}
                         className={`flex items-center gap-2 px-8 py-3 rounded-lg text-sm font-semibold shadow-sm transition-all ${
-                          isSuccess
-                            ? 'bg-green-600 text-white'
+                          createdTenantData
+                            ? 'bg-green-600 text-white cursor-not-allowed'
+                            : createTenantMutation.isPending
+                            ? 'bg-blue-400 text-white cursor-not-allowed'
                             : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95'
                         }`}
                       >
-                        {isSubmitting ? (
+                        {createTenantMutation.isPending ? (
                           <>
                             <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                             <span>Provisioning Tenant Shard...</span>
                           </>
-                        ) : isSuccess ? (
+                        ) : createdTenantData ? (
                           <>
                             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -844,7 +1032,7 @@ Powered by EduManage Nigeria`
       </div>
 
       {/* Success Modal */}
-      {isSuccess && (
+      {createdTenantData && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn">
           <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden animate-slideUp">
             {/* Decorative Top Bar */}
@@ -898,27 +1086,27 @@ Powered by EduManage Nigeria`
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1">
                     <span className="text-xs font-semibold text-gray-500">Tenant Name</span>
-                    <span className="text-sm font-semibold text-gray-900">{tenantName}</span>
+                    <span className="text-sm font-semibold text-gray-900">{createdTenantData.tenant.name}</span>
                   </div>
 
                   <div className="flex flex-col gap-1">
                     <span className="text-xs font-semibold text-gray-500">Tenant Code</span>
-                    <span className="text-sm font-mono font-bold text-blue-600">{shortCode}</span>
+                    <span className="text-sm font-mono font-bold text-blue-600">{createdTenantData.tenant.code}</span>
                   </div>
 
                   <div className="flex flex-col gap-1">
                     <span className="text-xs font-semibold text-gray-500">Subscription</span>
                     <span className="text-sm font-semibold text-gray-900 capitalize">
-                      {subscriptionTier} Plan ({studentQuota.toLocaleString()} seats)
+                      {createdTenantData.tenant.subscriptionTier} Plan ({createdTenantData.tenant.studentQuota?.toLocaleString()} seats)
                     </span>
                   </div>
 
                   <div className="flex flex-col gap-1">
                     <span className="text-xs font-semibold text-gray-500">Portal URL</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-mono text-blue-600 truncate">{generatedCredentials.portalUrl}</span>
+                      <span className="text-sm font-mono text-blue-600 truncate">{createdTenantData.adminCredentials.portalUrl}</span>
                       <button
-                        onClick={() => handleCopy(generatedCredentials.portalUrl, 'url')}
+                        onClick={() => handleCopy(createdTenantData.adminCredentials.portalUrl, 'url')}
                         className="p-1.5 rounded-md hover:bg-gray-200 transition-colors"
                         title="Copy URL"
                       >
@@ -956,7 +1144,7 @@ Powered by EduManage Nigeria`
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold text-gray-600">Admin Full Name</label>
                     <div className="px-4 py-2.5 rounded-lg bg-white border border-gray-200">
-                      <span className="text-sm font-semibold text-gray-900">{generatedCredentials.adminName}</span>
+                      <span className="text-sm font-semibold text-gray-900">{createdTenantData.adminCredentials.adminName}</span>
                     </div>
                   </div>
 
@@ -965,10 +1153,10 @@ Powered by EduManage Nigeria`
                     <label className="text-xs font-semibold text-gray-600">Admin Email / Username</label>
                     <div className="flex items-center gap-2">
                       <div className="flex-1 px-4 py-2.5 rounded-lg bg-white border border-gray-200">
-                        <span className="text-sm font-mono text-gray-900">{generatedCredentials.adminEmail}</span>
+                        <span className="text-sm font-mono text-gray-900">{createdTenantData.adminCredentials.adminEmail}</span>
                       </div>
                       <button
-                        onClick={() => handleCopy(generatedCredentials.adminEmail, 'email')}
+                        onClick={() => handleCopy(createdTenantData.adminCredentials.adminEmail, 'email')}
                         className="p-2.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 transition-colors"
                         title="Copy Email"
                       >
@@ -991,7 +1179,7 @@ Powered by EduManage Nigeria`
                     <div className="flex items-center gap-2">
                       <div className="flex-1 px-4 py-2.5 rounded-lg bg-white border border-gray-200 flex items-center gap-2">
                         <span className="flex-1 text-sm font-mono text-gray-900">
-                          {showPassword ? generatedCredentials.tempPassword : '••••••••••••'}
+                          {showPassword ? createdTenantData.adminCredentials.tempPassword : '••••••••••••'}
                         </span>
                         <button
                           onClick={() => setShowPassword(!showPassword)}
@@ -1011,7 +1199,7 @@ Powered by EduManage Nigeria`
                         </button>
                       </div>
                       <button
-                        onClick={() => handleCopy(generatedCredentials.tempPassword, 'password')}
+                        onClick={() => handleCopy(createdTenantData.adminCredentials.tempPassword, 'password')}
                         className="p-2.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 transition-colors"
                         title="Copy Password"
                       >

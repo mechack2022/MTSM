@@ -133,6 +133,7 @@ export const queryKeys = {
   // Tenants
   tenants: {
     all: ['tenants'] as const,
+    active: ['tenants', 'active'] as const,
     detail: (id: string) => ['tenants', id] as const,
   },
 

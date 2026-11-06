@@ -23,8 +23,48 @@ public class KeycloakUserService {
     private final Keycloak keycloak;
     private final KeycloakAdminConfig config;
 
+    public String createTenantAdmin(String tenantId, String fullName, String email, String tempPassword) {
+        String[] names = fullName != null ? fullName.split(" ", 2) : new String[]{"", ""};
+        String firstName = names.length > 0 && !names[0].isEmpty() ? names[0] : "Admin";
+        String lastName = names.length > 1 ? names[1] : "";
+
+        String userId = createUser(email, firstName, lastName, tempPassword, "tenant_admin");
+        setUserAttributes(userId, Map.of("tenant_id", List.of(tenantId)));
+        // Password already set in createUser, no need to set it again
+
+        log.info("Created tenant admin: {} for tenant: {}", email, tenantId);
+        return userId;
+    }
+
     public String createUser(String email, String firstName, String lastName, String password, String role) {
         RealmResource realmResource = keycloak.realm(config.getRealm());
+
+        // Check if user already exists
+        Optional<UserRepresentation> existingUser = getUserByEmail(email);
+        if (existingUser.isPresent()) {
+            String userId = existingUser.get().getId();
+            log.warn("User already exists in Keycloak: {}. Reusing existing user.", email);
+
+            // Try to update password, but don't fail if it doesn't work
+            try {
+                setUserPassword(userId, password, false);
+                log.info("Updated password for existing user: {}", email);
+            } catch (Exception e) {
+                log.warn("Could not update password for existing user {}: {}. User can still login with their existing password.",
+                        email, e.getMessage());
+            }
+
+            // Try to assign role
+            assignRoleToUser(userId, role);
+
+            return userId;
+        }
+
+        // Create password credential
+        CredentialRepresentation credential = new CredentialRepresentation();
+        credential.setType(CredentialRepresentation.PASSWORD);
+        credential.setValue(password);
+        credential.setTemporary(false);
 
         UserRepresentation user = new UserRepresentation();
         user.setUsername(email);
@@ -33,6 +73,7 @@ public class KeycloakUserService {
         user.setLastName(lastName);
         user.setEnabled(true);
         user.setEmailVerified(true);
+        user.setCredentials(List.of(credential));  // Set password during creation
 
         Response response = realmResource.users().create(user);
 
@@ -41,8 +82,6 @@ public class KeycloakUserService {
         }
 
         String userId = extractUserIdFromResponse(response);
-
-        setUserPassword(userId, password, false);
 
         assignRoleToUser(userId, role);
 
@@ -70,11 +109,17 @@ public class KeycloakUserService {
     }
 
     public void assignRoleToUser(String userId, String roleName) {
-        RealmResource realmResource = keycloak.realm(config.getRealm());
-        UserResource userResource = realmResource.users().get(userId);
+        try {
+            RealmResource realmResource = keycloak.realm(config.getRealm());
+            UserResource userResource = realmResource.users().get(userId);
 
-        var role = realmResource.roles().get(roleName).toRepresentation();
-        userResource.roles().realmLevel().add(List.of(role));
+            var role = realmResource.roles().get(roleName).toRepresentation();
+            userResource.roles().realmLevel().add(List.of(role));
+            log.info("Assigned role {} to user {}", roleName, userId);
+        } catch (Exception e) {
+            log.warn("Could not assign role {} to user {}: {}. Role may not exist or user may already have it.",
+                    roleName, userId, e.getMessage());
+        }
     }
 
     public void removeRoleFromUser(String userId, String roleName) {

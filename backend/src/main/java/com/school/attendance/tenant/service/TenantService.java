@@ -224,8 +224,10 @@ public class TenantService {
         Tenant tenant = tenantRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant not found with id: " + id));
 
-        tenantRepository.delete(tenant);
-        log.info("Deleted tenant: {} ({})", tenant.getName(), tenant.getCode());
+        // Soft delete - set deletedAt timestamp instead of removing from database
+        tenant.setDeletedAt(Instant.now());
+        tenantRepository.save(tenant);
+        log.info("Soft deleted tenant: {} ({})", tenant.getName(), tenant.getCode());
     }
 
     @Transactional(readOnly = true)

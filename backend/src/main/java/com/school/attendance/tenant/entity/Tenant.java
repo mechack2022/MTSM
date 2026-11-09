@@ -93,6 +93,9 @@ public class Tenant {
     @Column(nullable = false)
     private Instant updatedAt;
 
+    @Column
+    private Instant deletedAt;
+
     public enum TenantStatus {
         ACTIVE, SUSPENDED, INACTIVE
     }

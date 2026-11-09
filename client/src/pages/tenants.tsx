@@ -6,6 +6,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAllTenants, useLogout, useActivateTenant, useSuspendTenant } from '@/hooks'
+import { useStates } from '@/hooks/use-locations'
 import { useAuth } from '@/store'
 
 // ============================================================================
@@ -15,13 +16,14 @@ import { useAuth } from '@/store'
 export default function TenantsPage() {
   const navigate = useNavigate()
   const { data: tenants, isLoading } = useAllTenants()
+  const { data: states } = useStates()
   const logout = useLogout()
   const { user } = useAuth()
   const activateTenant = useActivateTenant()
   const suspendTenant = useSuspendTenant()
 
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedState, setSelectedState] = useState('All States (36 + FCT)')
+  const [selectedState, setSelectedState] = useState<string>('all')
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [isStateDropdownOpen, setIsStateDropdownOpen] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -58,17 +60,12 @@ export default function TenantsPage() {
       (selectedStatus === 'Active' && tenant.status === 'ACTIVE') ||
       (selectedStatus === 'Suspended' && tenant.status === 'SUSPENDED')
 
-    return matchesSearch && matchesStatus
-  })
+    const matchesState =
+      selectedState === 'all' ||
+      tenant.stateId === selectedState
 
-  const states = [
-    'All States (36 + FCT)',
-    'Lagos',
-    'Abuja (FCT)',
-    'Rivers',
-    'Oyo',
-    'Kaduna',
-  ]
+    return matchesSearch && matchesStatus && matchesState
+  })
 
   const statusFilters = [
     { label: 'All Tenants (3)', value: 'all' },
@@ -262,24 +259,41 @@ export default function TenantsPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  <span>{selectedState}</span>
+                  <span>
+                    {selectedState === 'all'
+                      ? `All States ${states ? `(${states.length})` : ''}`
+                      : states?.find(s => s.id === selectedState)?.name || 'Select State'}
+                  </span>
                   <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
 
                 {isStateDropdownOpen && (
-                  <div className="absolute right-0 mt-1 w-56 rounded-xl bg-white shadow-xl z-30 p-1.5 flex flex-col gap-0.5 border border-gray-100">
-                    {states.map((state) => (
+                  <div className="absolute right-0 mt-1 w-56 rounded-xl bg-white shadow-xl z-30 p-1.5 flex flex-col gap-0.5 border border-gray-100 max-h-96 overflow-y-auto">
+                    <button
+                      onClick={() => {
+                        setSelectedState('all')
+                        setIsStateDropdownOpen(false)
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm ${
+                        selectedState === 'all' ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-900 hover:bg-gray-100'
+                      }`}
+                    >
+                      All States {states ? `(${states.length})` : ''}
+                    </button>
+                    {states?.map((state) => (
                       <button
-                        key={state}
+                        key={state.id}
                         onClick={() => {
-                          setSelectedState(state)
+                          setSelectedState(state.id)
                           setIsStateDropdownOpen(false)
                         }}
-                        className="w-full text-left px-3 py-2 rounded-lg text-gray-900 hover:bg-gray-100 text-sm"
+                        className={`w-full text-left px-3 py-2 rounded-lg text-sm ${
+                          selectedState === state.id ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-900 hover:bg-gray-100'
+                        }`}
                       >
-                        {state}
+                        {state.name}
                       </button>
                     ))}
                   </div>

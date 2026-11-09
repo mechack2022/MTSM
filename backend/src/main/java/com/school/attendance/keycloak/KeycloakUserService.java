@@ -28,15 +28,20 @@ public class KeycloakUserService {
         String firstName = names.length > 0 && !names[0].isEmpty() ? names[0] : "Admin";
         String lastName = names.length > 1 ? names[1] : "";
 
-        String userId = createUser(email, firstName, lastName, tempPassword, "tenant_admin");
+        // Create user as DISABLED initially - will be enabled when tenant is activated
+        String userId = createUser(email, firstName, lastName, tempPassword, "tenant_admin", false);
         setUserAttributes(userId, Map.of("tenant_id", List.of(tenantId)));
         // Password already set in createUser, no need to set it again
 
-        log.info("Created tenant admin: {} for tenant: {}", email, tenantId);
+        log.info("Created tenant admin: {} for tenant: {} (disabled until tenant activation)", email, tenantId);
         return userId;
     }
 
     public String createUser(String email, String firstName, String lastName, String password, String role) {
+        return createUser(email, firstName, lastName, password, role, true);
+    }
+
+    public String createUser(String email, String firstName, String lastName, String password, String role, boolean enabled) {
         RealmResource realmResource = keycloak.realm(config.getRealm());
 
         // Check if user already exists
@@ -60,18 +65,18 @@ public class KeycloakUserService {
             return userId;
         }
 
-        // Create password credential
+        // Create password credential (marked as temporary to force password change on first login)
         CredentialRepresentation credential = new CredentialRepresentation();
         credential.setType(CredentialRepresentation.PASSWORD);
         credential.setValue(password);
-        credential.setTemporary(false);
+        credential.setTemporary(true);  // Force password change on first login
 
         UserRepresentation user = new UserRepresentation();
         user.setUsername(email);
         user.setEmail(email);
         user.setFirstName(firstName);
         user.setLastName(lastName);
-        user.setEnabled(true);
+        user.setEnabled(enabled);  // Controlled by caller - disabled for tenant admins until activation
         user.setEmailVerified(false);  // Email verification required
         user.setCredentials(List.of(credential));  // Set password during creation
 
@@ -85,7 +90,7 @@ public class KeycloakUserService {
 
         assignRoleToUser(userId, role);
 
-        log.info("Created Keycloak user: {} with role: {}", email, role);
+        log.info("Created Keycloak user: {} with role: {} (enabled: {})", email, role, enabled);
         return userId;
     }
 
@@ -194,5 +199,15 @@ public class KeycloakUserService {
         userResource.update(user);
 
         log.info("Set emailVerified={} for user: {}", verified, userId);
+    }
+
+    // Expose Keycloak client for advanced operations (e.g., sync service)
+    public Keycloak getKeycloak() {
+        return keycloak;
+    }
+
+    // Expose config for realm operations
+    public KeycloakAdminConfig getConfig() {
+        return config;
     }
 }

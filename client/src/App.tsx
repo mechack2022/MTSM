@@ -26,6 +26,7 @@ import { KeycloakProvider } from '@/lib/keycloak-provider'
 
 // These will be created in the next steps
 import LandingPage from '@/pages/landing'
+import LoginPage from '@/pages/login'
 import SignupPage from '@/pages/signup'
 import VerifyEmailPage from '@/pages/verify-email'
 import ResendVerificationPage from '@/pages/resend-verification'
@@ -170,6 +171,7 @@ function AppRoutes() {
     <Routes>
       {/* Public Routes */}
       <Route path="/" element={<LandingPage />} />
+      <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/resend-verification" element={<ResendVerificationPage />} />

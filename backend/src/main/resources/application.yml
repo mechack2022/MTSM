@@ -33,7 +33,7 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
-      ddl-auto: create-drop  # For testing only - will switch to validate with Flyway later
+      ddl-auto: update  # Persist data across restarts - update schema automatically
     properties:
       hibernate:
         format_sql: true
@@ -224,7 +224,7 @@ app:
   mail:
     from: noreply@mtsms.local
     app-name: MTSMS - School Management System
-    app-url: http://localhost:3000
+    app-url: http://localhost:3005
 
   # Row-Level Security session variables
   rls:

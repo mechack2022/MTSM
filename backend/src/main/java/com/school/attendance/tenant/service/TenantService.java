@@ -256,6 +256,13 @@ public class TenantService {
             throw new IllegalStateException("Cannot activate tenant. Email verification is required before activation.");
         }
 
+        // Enable the Keycloak user so they can login
+        keycloakUserService.getUserByEmail(tenant.getContactEmail())
+                .ifPresent(user -> {
+                    keycloakUserService.enableUser(user.getId());
+                    log.info("Enabled Keycloak user: {} for tenant: {}", tenant.getContactEmail(), tenant.getCode());
+                });
+
         tenant.setStatus(Tenant.TenantStatus.ACTIVE);
         Tenant updatedTenant = tenantRepository.save(tenant);
         log.info("Activated tenant: {} ({})", updatedTenant.getName(), updatedTenant.getCode());
@@ -271,6 +278,13 @@ public class TenantService {
         if (tenant.getStatus() == Tenant.TenantStatus.SUSPENDED) {
             throw new IllegalStateException("Tenant is already suspended");
         }
+
+        // Disable the Keycloak user so they cannot login
+        keycloakUserService.getUserByEmail(tenant.getContactEmail())
+                .ifPresent(user -> {
+                    keycloakUserService.disableUser(user.getId());
+                    log.info("Disabled Keycloak user: {} for tenant: {}", tenant.getContactEmail(), tenant.getCode());
+                });
 
         tenant.setStatus(Tenant.TenantStatus.SUSPENDED);
         Tenant updatedTenant = tenantRepository.save(tenant);

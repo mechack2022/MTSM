@@ -42,4 +42,7 @@ public interface TenantRepository extends JpaRepository<Tenant, UUID> {
     @Query("SELECT t FROM Tenant t WHERE (LOWER(t.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
            "OR LOWER(t.code) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) AND t.deletedAt IS NULL ORDER BY t.name")
     List<Tenant> searchByNameOrCode(String searchTerm);
+
+    @Query("SELECT t.contactEmail FROM Tenant t WHERE t.deletedAt IS NULL")
+    List<String> findAllContactEmails();
 }

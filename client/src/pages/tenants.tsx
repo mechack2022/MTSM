@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAllTenants, useLogout } from '@/hooks'
+import { useAllTenants, useLogout, useActivateTenant, useSuspendTenant } from '@/hooks'
 import { useAuth } from '@/store'
 
 // ============================================================================
@@ -17,6 +17,8 @@ export default function TenantsPage() {
   const { data: tenants, isLoading } = useAllTenants()
   const logout = useLogout()
   const { user } = useAuth()
+  const activateTenant = useActivateTenant()
+  const suspendTenant = useSuspendTenant()
 
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedState, setSelectedState] = useState('All States (36 + FCT)')
@@ -53,8 +55,8 @@ export default function TenantsPage() {
 
     const matchesStatus =
       selectedStatus === 'all' ||
-      (selectedStatus === 'Active' && tenant.isActive) ||
-      (selectedStatus === 'Suspended' && !tenant.isActive)
+      (selectedStatus === 'Active' && tenant.status === 'ACTIVE') ||
+      (selectedStatus === 'Suspended' && tenant.status === 'SUSPENDED')
 
     return matchesSearch && matchesStatus
   })
@@ -465,12 +467,12 @@ export default function TenantsPage() {
                         </td>
                         <td className="py-3.5 px-4">
                           <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                            tenant.isActive
+                            tenant.status === 'ACTIVE'
                               ? 'bg-green-100 text-green-700'
                               : 'bg-gray-100 text-gray-600'
                           }`}>
-                            <span className={`h-1.5 w-1.5 rounded-full ${tenant.isActive ? 'bg-green-600' : 'bg-gray-400'}`}></span>
-                            {tenant.isActive ? 'Active' : 'Suspended'}
+                            <span className={`h-1.5 w-1.5 rounded-full ${tenant.status === 'ACTIVE' ? 'bg-green-600' : 'bg-gray-400'}`}></span>
+                            {tenant.status === 'ACTIVE' ? 'Active' : 'Suspended'}
                           </span>
                         </td>
                         <td className="py-3.5 px-4 text-right">
@@ -481,9 +483,31 @@ export default function TenantsPage() {
                             >
                               Edit
                             </button>
-                            <button className="px-2.5 py-1 rounded-lg text-red-600 hover:bg-red-50 text-xs font-semibold transition-colors">
-                              {tenant.isActive ? 'Deactivate' : 'Activate'}
-                            </button>
+                            {!tenant.emailVerified ? (
+                              <button
+                                disabled
+                                className="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-500 text-xs font-semibold cursor-not-allowed"
+                                title="Email verification pending"
+                              >
+                                Pending Email Verification
+                              </button>
+                            ) : tenant.status === 'SUSPENDED' ? (
+                              <button
+                                onClick={() => activateTenant.mutate(tenant.id)}
+                                disabled={activateTenant.isPending}
+                                className="px-2.5 py-1 rounded-lg text-green-600 hover:bg-green-50 text-xs font-semibold transition-colors disabled:opacity-50"
+                              >
+                                {activateTenant.isPending ? 'Activating...' : 'Activate'}
+                              </button>
+                            ) : tenant.status === 'ACTIVE' ? (
+                              <button
+                                onClick={() => suspendTenant.mutate(tenant.id)}
+                                disabled={suspendTenant.isPending}
+                                className="px-2.5 py-1 rounded-lg text-red-600 hover:bg-red-50 text-xs font-semibold transition-colors disabled:opacity-50"
+                              >
+                                {suspendTenant.isPending ? 'Suspending...' : 'Suspend'}
+                              </button>
+                            ) : null}
                           </div>
                         </td>
                       </tr>

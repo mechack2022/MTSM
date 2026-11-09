@@ -75,4 +75,18 @@ public class TenantController {
         List<TenantResponse> tenants = tenantService.searchTenants(q);
         return ResponseEntity.ok(tenants);
     }
+
+    @PostMapping("/{id}/activate")
+    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
+    public ResponseEntity<TenantResponse> activateTenant(@PathVariable UUID id) {
+        TenantResponse tenant = tenantService.activateTenant(id);
+        return ResponseEntity.ok(tenant);
+    }
+
+    @PostMapping("/{id}/suspend")
+    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
+    public ResponseEntity<TenantResponse> suspendTenant(@PathVariable UUID id) {
+        TenantResponse tenant = tenantService.suspendTenant(id);
+        return ResponseEntity.ok(tenant);
+    }
 }

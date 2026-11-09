@@ -72,7 +72,7 @@ public class KeycloakUserService {
         user.setFirstName(firstName);
         user.setLastName(lastName);
         user.setEnabled(true);
-        user.setEmailVerified(true);
+        user.setEmailVerified(false);  // Email verification required
         user.setCredentials(List.of(credential));  // Set password during creation
 
         Response response = realmResource.users().create(user);
@@ -183,5 +183,16 @@ public class KeycloakUserService {
     private String extractUserIdFromResponse(Response response) {
         String location = response.getHeaderString("Location");
         return location.substring(location.lastIndexOf('/') + 1);
+    }
+
+    public void setEmailVerified(String userId, boolean verified) {
+        RealmResource realmResource = keycloak.realm(config.getRealm());
+        UserResource userResource = realmResource.users().get(userId);
+
+        UserRepresentation user = userResource.toRepresentation();
+        user.setEmailVerified(verified);
+        userResource.update(user);
+
+        log.info("Set emailVerified={} for user: {}", verified, userId);
     }
 }

@@ -7,7 +7,6 @@ public record CreateTenantResponse(
     public record AdminCredentials(
         String adminName,
         String adminEmail,
-        String tempPassword,
         String portalUrl
     ) {}
 }

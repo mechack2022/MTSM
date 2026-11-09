@@ -97,3 +97,47 @@ export function useDeleteTenant() {
     },
   })
 }
+
+export function useActivateTenant() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await api.post<Tenant>(`/tenants/${id}/activate`)
+      return response.data!
+    },
+
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenants.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenants.detail(data.id) })
+      toast.success(`Tenant "${data.name}" activated successfully!`)
+    },
+
+    onError: (error: any) => {
+      const message = error?.response?.data?.message || error?.message || 'Failed to activate tenant'
+      toast.error(message)
+    },
+  })
+}
+
+export function useSuspendTenant() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await api.post<Tenant>(`/tenants/${id}/suspend`)
+      return response.data!
+    },
+
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenants.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenants.detail(data.id) })
+      toast.success(`Tenant "${data.name}" suspended successfully!`)
+    },
+
+    onError: (error: any) => {
+      const message = error?.response?.data?.message || error?.message || 'Failed to suspend tenant'
+      toast.error(message)
+    },
+  })
+}

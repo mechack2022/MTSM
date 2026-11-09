@@ -3,10 +3,12 @@ package com.school.attendance.tenant.dto;
 import com.school.attendance.tenant.entity.Tenant;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
+import java.util.UUID;
 
 public record CreateTenantRequest(
     @NotBlank(message = "Tenant code is required")
@@ -25,8 +27,11 @@ public record CreateTenantRequest(
     @Pattern(regexp = "^[a-z0-9-]*$", message = "Subdomain must be lowercase letters, numbers, or hyphens")
     String subdomain,
 
-    @Size(max = 50, message = "State must not exceed 50 characters")
-    String state,
+    @NotNull(message = "State is required")
+    UUID stateId,
+
+    @NotNull(message = "Local Government Area is required")
+    UUID localGovernmentId,
 
     @Size(max = 500, message = "Address must not exceed 500 characters")
     String address,

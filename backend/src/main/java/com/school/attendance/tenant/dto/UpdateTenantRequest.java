@@ -5,13 +5,14 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
+import java.util.UUID;
 
 public record UpdateTenantRequest(
     @Size(min = 3, max = 200, message = "Name must be 3-200 characters")
     String name,
 
-    @Size(max = 50, message = "State must not exceed 50 characters")
-    String state,
+    UUID stateId,
+    UUID localGovernmentId,
 
     @Size(max = 500, message = "Address must not exceed 500 characters")
     String address,

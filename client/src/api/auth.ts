@@ -12,7 +12,7 @@ export const authApi = {
   },
 
   verifyEmail: async (token: string) => {
-    return api.get<VerifyEmailResponse>(`/auth/verify-email?token=${token}`)
+    return api.get<VerifyEmailResponse>(`/email-verification/verify?token=${token}`)
   },
 
   resendVerification: async (data: ResendVerificationRequest) => {

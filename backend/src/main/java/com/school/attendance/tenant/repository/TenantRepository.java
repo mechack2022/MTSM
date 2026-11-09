@@ -12,30 +12,19 @@ import java.util.UUID;
 @Repository
 public interface TenantRepository extends JpaRepository<Tenant, UUID> {
 
-    /**
-     * Find tenant by unique code
-     */
     Optional<Tenant> findByCode(String code);
-
-    /**
-     * Check if tenant code already exists
-     */
     boolean existsByCode(String code);
 
-    /**
-     * Find all active tenants
-     */
+    boolean existsByContactEmail(String contactEmail);
+
+    boolean existsByCacNumber(String cacNumber);
+
+    boolean existsByContactPhone(String contactPhone);
+
     @Query("SELECT t FROM Tenant t WHERE t.status = 'ACTIVE' ORDER BY t.name")
     List<Tenant> findAllActive();
 
-    /**
-     * Find tenants by status
-     */
     List<Tenant> findByStatus(Tenant.TenantStatus status);
-
-    /**
-     * Search tenants by name or code (case-insensitive)
-     */
     @Query("SELECT t FROM Tenant t WHERE LOWER(t.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
            "OR LOWER(t.code) LIKE LOWER(CONCAT('%', :searchTerm, '%')) ORDER BY t.name")
     List<Tenant> searchByNameOrCode(String searchTerm);

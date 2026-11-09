@@ -22,19 +22,35 @@ export interface ApiError {
 // ENTITIES
 // ============================================================================
 
+export interface State {
+  id: string
+  name: string
+  code: string
+}
+
+export interface LocalGovernment {
+  id: string
+  stateId: string
+  name: string
+}
+
 export interface Tenant {
   id: string
   code: string
   name: string
   cacNumber?: string | null
   subdomain?: string | null
-  state?: string | null
+  stateId?: string | null
+  stateName?: string | null
+  localGovernmentId?: string | null
+  localGovernmentName?: string | null
   address?: string | null
   contactName?: string | null
   roleTitle?: string | null
   contactEmail: string
   contactPhone?: string | null
   status: 'ACTIVE' | 'SUSPENDED' | 'INACTIVE'
+  emailVerified?: boolean
   subscriptionTier?: 'BASIC' | 'STANDARD' | 'ENTERPRISE' | null
   studentQuota?: number | null
   billingCycle?: 'ANNUAL' | 'TERMLY' | 'BIANNUAL' | null
@@ -50,7 +66,8 @@ export interface CreateTenantRequest {
   name: string
   cacNumber?: string | null
   subdomain?: string | null
-  state?: string | null
+  stateId?: string | null
+  localGovernmentId?: string | null
   address?: string | null
   contactName?: string | null
   roleTitle?: string | null
@@ -66,7 +83,8 @@ export interface CreateTenantRequest {
 
 export interface UpdateTenantRequest {
   name?: string
-  state?: string | null
+  stateId?: string | null
+  localGovernmentId?: string | null
   address?: string | null
   contactName?: string | null
   roleTitle?: string | null
@@ -86,7 +104,6 @@ export interface CreateTenantResponse {
   adminCredentials: {
     adminName: string
     adminEmail: string
-    tempPassword: string
     portalUrl: string
   }
 }
@@ -300,7 +317,14 @@ export interface SignupResponse {
 export interface VerifyEmailResponse {
   success: boolean
   message: string
-  username: string
+  metadata: {
+    tenantId?: string
+    keycloakUserId?: string
+    recipientName?: string
+    tempPassword?: string
+    portalUrl?: string
+    [key: string]: any
+  }
 }
 
 export interface ResendVerificationRequest {

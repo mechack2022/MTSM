@@ -134,35 +134,35 @@ apiClient.interceptors.response.use(
         handleUnauthorized()
         return Promise.reject(
           response.data?.error ||
-            createApiError('UNAUTHORIZED', 'Authentication required')
+            createApiError('UNAUTHORIZED', response.data?.message || 'Authentication required')
         )
 
       case 403:
         // Forbidden
         return Promise.reject(
           response.data?.error ||
-            createApiError('FORBIDDEN', 'Access denied')
+            createApiError('FORBIDDEN', response.data?.message || 'Access denied')
         )
 
       case 404:
         // Not found
         return Promise.reject(
           response.data?.error ||
-            createApiError('NOT_FOUND', 'Resource not found')
+            createApiError('NOT_FOUND', response.data?.message || 'Resource not found')
         )
 
       case 409:
         // Conflict
         return Promise.reject(
           response.data?.error ||
-            createApiError('CONFLICT', 'Resource conflict')
+            createApiError('CONFLICT', response.data?.message || 'Resource conflict')
         )
 
       case 422:
         // Validation error
         return Promise.reject(
           response.data?.error ||
-            createApiError('VALIDATION_ERROR', 'Validation failed')
+            createApiError('VALIDATION_ERROR', response.data?.message || 'Validation failed')
         )
 
       case 500:
@@ -174,7 +174,7 @@ apiClient.interceptors.response.use(
         }
         return Promise.reject(
           response.data?.error ||
-            createApiError('SERVER_ERROR', 'Server error occurred')
+            createApiError('SERVER_ERROR', response.data?.message || 'Server error occurred')
         )
 
       default:

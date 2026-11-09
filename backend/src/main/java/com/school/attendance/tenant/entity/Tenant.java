@@ -1,5 +1,7 @@
 package com.school.attendance.tenant.entity;
 
+import com.school.attendance.location.entity.LocalGovernment;
+import com.school.attendance.location.entity.State;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -29,14 +31,19 @@ public class Tenant {
     @Column(nullable = false, length = 200)
     private String name;
 
-    @Column(length = 50)
+    @Column(unique = true, length = 50)
     private String cacNumber;
 
     @Column(unique = true, length = 50)
     private String subdomain;
 
-    @Column(length = 50)
-    private String state;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "state_id")
+    private State state;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "lga_id")
+    private LocalGovernment localGovernment;
 
     @Column(length = 500)
     private String address;
@@ -47,10 +54,10 @@ public class Tenant {
     @Column(length = 100)
     private String roleTitle;
 
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false, unique = true, length = 100)
     private String contactEmail;
 
-    @Column(length = 20)
+    @Column(unique = true, length = 20)
     private String contactPhone;
 
     @Enumerated(EnumType.STRING)

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { authApi } from '@/api/auth'
 import type { VerifyEmailResponse } from '@/types'
+import toast from 'react-hot-toast'
 
 type VerificationState = 'verifying' | 'success' | 'error' | 'no-token'
 
@@ -12,6 +13,8 @@ export default function VerifyEmailPage() {
   const [state, setState] = useState<VerificationState>('verifying')
   const [verificationData, setVerificationData] = useState<VerifyEmailResponse | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const hasAttemptedVerification = useRef(false)
 
   const token = searchParams.get('token')
 
@@ -38,8 +41,27 @@ export default function VerifyEmailPage() {
       return
     }
 
+    // Prevent multiple verification attempts
+    if (hasAttemptedVerification.current) {
+      return
+    }
+
+    hasAttemptedVerification.current = true
     verifyMutation.mutate(token)
   }, [token])
+
+  const handleCopyPassword = async () => {
+    if (verificationData?.metadata?.tempPassword) {
+      await navigator.clipboard.writeText(verificationData.metadata.tempPassword)
+      toast.success('Password copied to clipboard!')
+    }
+  }
+
+  const handleCopyPortalUrl = async () => {
+    const portalUrl = verificationData?.metadata?.portalUrl || 'https://app.edumanage.ng'
+    await navigator.clipboard.writeText(portalUrl)
+    toast.success('Portal URL copied to clipboard!')
+  }
 
   return (
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center">
@@ -131,26 +153,118 @@ export default function VerifyEmailPage() {
                 </div>
 
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                  Email Verified!
+                  Email Verified Successfully!
                 </h2>
 
                 <p className="text-gray-600 mb-6">
-                  {verificationData?.message || 'Your email has been successfully verified. You can now log in to your account.'}
+                  {verificationData?.message || 'Your email has been verified. You can now log in to your account.'}
                 </p>
 
-                {verificationData?.username && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                    <p className="text-sm text-blue-900">
-                      <span className="font-semibold">Username:</span> {verificationData.username}
-                    </p>
+                {/* Admin Credentials */}
+                {verificationData?.metadata?.tempPassword && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6 text-left">
+                    <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">
+                      Your Login Credentials
+                    </h3>
+
+                    {/* Admin Name */}
+                    {verificationData.metadata.recipientName && (
+                      <div className="mb-4">
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">
+                          Administrator Name
+                        </label>
+                        <div className="text-sm text-gray-900 font-medium">
+                          {verificationData.metadata.recipientName}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Temporary Password */}
+                    <div className="mb-4">
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">
+                        Temporary Password
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 flex items-center gap-2 bg-white border border-blue-200 rounded-lg px-3 py-2">
+                          <input
+                            type={showPassword ? 'text' : 'password'}
+                            value={verificationData.metadata.tempPassword}
+                            readOnly
+                            className="flex-1 text-sm font-mono text-gray-900 bg-transparent border-none outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="text-gray-500 hover:text-gray-700"
+                          >
+                            {showPassword ? (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                              </svg>
+                            ) : (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleCopyPassword}
+                          className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                          title="Copy password"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        </button>
+                      </div>
+                      <p className="text-xs text-amber-600 mt-2">
+                        Please change this password after your first login for security.
+                      </p>
+                    </div>
+
+                    {/* Portal URL */}
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">
+                        Portal URL
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 bg-white border border-blue-200 rounded-lg px-3 py-2">
+                          <a
+                            href={verificationData.metadata.portalUrl || 'https://app.edumanage.ng'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-blue-600 hover:text-blue-700 hover:underline break-all"
+                          >
+                            {verificationData.metadata.portalUrl || 'https://app.edumanage.ng'}
+                          </a>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleCopyPortalUrl}
+                          className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                          title="Copy portal URL"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
 
+                {/* Login Button */}
                 <button
-                  onClick={() => navigate('/login')}
-                  className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-medium shadow-sm hover:shadow-lg"
+                  onClick={() => {
+                    const portalUrl = verificationData?.metadata?.portalUrl || 'https://app.edumanage.ng'
+                    window.open(portalUrl, '_blank')
+                  }}
+                  className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all font-medium shadow-lg hover:shadow-xl"
                 >
-                  Go to Login
+                  Go to Login Portal
                 </button>
               </>
             )}

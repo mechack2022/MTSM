@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCreateTenant } from '@/hooks/use-tenants'
+import { useStates, useLocalGovernments } from '@/hooks/use-locations'
 import type { CreateTenantResponse } from '@/types'
 
 // ============================================================================
@@ -32,11 +33,15 @@ export default function CreateTenantPage() {
   const navigate = useNavigate()
   const createTenantMutation = useCreateTenant()
 
+  // Fetch states and local governments
+  const { data: states = [], isLoading: isLoadingStates } = useStates()
+
   const [tenantName, setTenantName] = useState('')
   const [shortCode, setShortCode] = useState('')
   const [cacNumber, setCacNumber] = useState('')
   const [subdomain, setSubdomain] = useState('crownjewel')
-  const [state, setState] = useState('')
+  const [selectedStateId, setSelectedStateId] = useState('')
+  const [selectedLGAId, setSelectedLGAId] = useState('')
   const [physicalAddress, setPhysicalAddress] = useState('')
   const [contactName, setContactName] = useState('')
   const [roleTitle, setRoleTitle] = useState('')
@@ -45,6 +50,9 @@ export default function CreateTenantPage() {
   const [subscriptionTier, setSubscriptionTier] = useState('STANDARD')
   const [studentQuota, setStudentQuota] = useState(1500)
   const [billingCycle, setBillingCycle] = useState('ANNUAL')
+
+  // Fetch LGAs for the selected state
+  const { data: localGovernments = [], isLoading: isLoadingLGAs } = useLocalGovernments(selectedStateId || null)
 
   const [subdomainTouched, setSubdomainTouched] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -63,6 +71,11 @@ export default function CreateTenantPage() {
       }
     }
   }, [tenantName, subdomainTouched])
+
+  // Reset LGA selection when state changes
+  useEffect(() => {
+    setSelectedLGAId('')
+  }, [selectedStateId])
 
   // Handle subdomain input
   const handleSubdomainChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -91,6 +104,15 @@ export default function CreateTenantPage() {
     }
   }
 
+  // Handle phone input - only numbers, max 10 digits
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '') // Remove non-digits
+    if (value.length <= 10) {
+      setContactPhone(value)
+      clearError('contactPhone')
+    }
+  }
+
   // Check subdomain availability
   const isSubdomainValid = subdomain.length > 2
 
@@ -110,10 +132,11 @@ export default function CreateTenantPage() {
 🌐 *Portal URL:* ${createdTenantData.adminCredentials.portalUrl}
 
 👤 *Administrator:* ${createdTenantData.adminCredentials.adminName}
-📧 *Email/Username:* ${createdTenantData.adminCredentials.adminEmail}
-🔑 *Temporary Password:* ${createdTenantData.adminCredentials.tempPassword}
+📧 *Email:* ${createdTenantData.adminCredentials.adminEmail}
 
-⚠️ *Security Notice:* This password expires in 48 hours. Please login and change immediately.
+⚠️ *Important:* A verification email has been sent to the administrator. They must verify their email before logging in. The login credentials will be provided after email verification.
+
+The verification link expires in 24 hours.
 
 Powered by EduManage Nigeria`
 
@@ -144,8 +167,13 @@ Powered by EduManage Nigeria`
     }
 
     // State
-    if (!state) {
+    if (!selectedStateId) {
       newErrors.state = 'Please select a state'
+    }
+
+    // Local Government
+    if (!selectedLGAId) {
+      newErrors.lga = 'Please select a local government area'
     }
 
     // Physical Address
@@ -173,8 +201,8 @@ Powered by EduManage Nigeria`
     // Contact Phone
     if (!contactPhone.trim()) {
       newErrors.contactPhone = 'Phone number is required'
-    } else if (!/^\d{10,11}$/.test(contactPhone.replace(/\s/g, ''))) {
-      newErrors.contactPhone = 'Please enter a valid Nigerian phone number (10-11 digits)'
+    } else if (contactPhone.length !== 10) {
+      newErrors.contactPhone = 'Phone number must be exactly 10 digits'
     }
 
     // Student Quota
@@ -202,12 +230,13 @@ Powered by EduManage Nigeria`
       name: tenantName,
       cacNumber: cacNumber || null,
       subdomain: subdomain || null,
-      state: state || null,
+      stateId: selectedStateId || null,
+      localGovernmentId: selectedLGAId || null,
       address: physicalAddress || null,
       contactName: contactName || null,
       roleTitle: roleTitle || null,
       contactEmail,
-      contactPhone: contactPhone || null,
+      contactPhone: contactPhone ? `+234${contactPhone.replace(/\s/g, '')}` : null,
       subscriptionTier: subscriptionTier.toUpperCase() as 'BASIC' | 'STANDARD' | 'ENTERPRISE',
       studentQuota,
       billingCycle: billingCycle.toUpperCase() as 'ANNUAL' | 'TERMLY' | 'BIANNUAL',
@@ -518,28 +547,67 @@ Powered by EduManage Nigeria`
                                 : 'bg-gray-100 focus:bg-white focus:ring-blue-500/20'
                             }`}
                             id="stateSelect"
-                            value={state}
+                            value={selectedStateId}
                             onChange={(e) => {
-                              setState(e.target.value)
+                              setSelectedStateId(e.target.value)
                               clearError('state')
                             }}
+                            disabled={isLoadingStates}
                           >
-                            <option value="">Select Federal State...</option>
-                            <option value="lagos">Lagos State</option>
-                            <option value="fct">Abuja (FCT)</option>
-                            <option value="rivers">Rivers State</option>
-                            <option value="oyo">Oyo State</option>
-                            <option value="kano">Kano State</option>
-                            <option value="kaduna">Kaduna State</option>
-                            <option value="enugu">Enugu State</option>
-                            <option value="edo">Edo State</option>
-                            <option value="ogun">Ogun State</option>
+                            <option value="">
+                              {isLoadingStates ? 'Loading states...' : 'Select Federal State...'}
+                            </option>
+                            {states.map((state) => (
+                              <option key={state.id} value={state.id}>
+                                {state.name}
+                              </option>
+                            ))}
                           </select>
                           <svg className="w-5 h-5 pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                           </svg>
                         </div>
                         {errors.state && <ErrorMessage message={errors.state} />}
+                      </div>
+
+                      {/* Local Government */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-gray-700" htmlFor="lgaSelect">
+                          Local Government Area <span className="text-red-600">*</span>
+                        </label>
+                        <div className="relative">
+                          <select
+                            className={`w-full appearance-none px-4 py-2.5 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 transition-all ${
+                              errors.lga
+                                ? 'bg-red-50 border border-red-300 focus:ring-red-500/20'
+                                : 'bg-gray-100 focus:bg-white focus:ring-blue-500/20'
+                            }`}
+                            id="lgaSelect"
+                            value={selectedLGAId}
+                            onChange={(e) => {
+                              setSelectedLGAId(e.target.value)
+                              clearError('lga')
+                            }}
+                            disabled={!selectedStateId || isLoadingLGAs}
+                          >
+                            <option value="">
+                              {!selectedStateId
+                                ? 'Please select a state first...'
+                                : isLoadingLGAs
+                                ? 'Loading local governments...'
+                                : 'Select Local Government...'}
+                            </option>
+                            {localGovernments.map((lga) => (
+                              <option key={lga.id} value={lga.id}>
+                                {lga.name}
+                              </option>
+                            ))}
+                          </select>
+                          <svg className="w-5 h-5 pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                        {errors.lga && <ErrorMessage message={errors.lga} />}
                       </div>
 
                       {/* Official Address */}
@@ -677,13 +745,12 @@ Powered by EduManage Nigeria`
                                 : 'bg-gray-100 focus:bg-white focus:ring-blue-500/20'
                             }`}
                             id="contactPhone"
-                            placeholder="803 123 4567"
+                            placeholder="8031234567"
                             type="tel"
+                            inputMode="numeric"
+                            maxLength={10}
                             value={contactPhone}
-                            onChange={(e) => {
-                              setContactPhone(e.target.value)
-                              clearError('contactPhone')
-                            }}
+                            onChange={handlePhoneChange}
                           />
                         </div>
                         {errors.contactPhone ? (
@@ -1125,17 +1192,17 @@ Powered by EduManage Nigeria`
                 </div>
               </div>
 
-              {/* Root Admin Credentials */}
+              {/* Email Verification Notice */}
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
                 <div className="flex items-start gap-3 mb-4">
                   <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     </svg>
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-1">Root Tenant Admin Credentials</h3>
-                    <p className="text-xs text-gray-600">Securely share these credentials with the designated administrator.</p>
+                    <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-1">Email Verification Required</h3>
+                    <p className="text-xs text-gray-600">A verification email has been sent to the admin.</p>
                   </div>
                 </div>
 
@@ -1150,7 +1217,7 @@ Powered by EduManage Nigeria`
 
                   {/* Admin Email */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-gray-600">Admin Email / Username</label>
+                    <label className="text-xs font-semibold text-gray-600">Admin Email</label>
                     <div className="flex items-center gap-2">
                       <div className="flex-1 px-4 py-2.5 rounded-lg bg-white border border-gray-200">
                         <span className="text-sm font-mono text-gray-900">{createdTenantData.adminCredentials.adminEmail}</span>
@@ -1172,59 +1239,19 @@ Powered by EduManage Nigeria`
                       </button>
                     </div>
                   </div>
-
-                  {/* Temporary Password */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-gray-600">Temporary Password</label>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 px-4 py-2.5 rounded-lg bg-white border border-gray-200 flex items-center gap-2">
-                        <span className="flex-1 text-sm font-mono text-gray-900">
-                          {showPassword ? createdTenantData.adminCredentials.tempPassword : '••••••••••••'}
-                        </span>
-                        <button
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="p-1 rounded hover:bg-gray-100 transition-colors"
-                          title={showPassword ? 'Hide password' : 'Show password'}
-                        >
-                          {showPassword ? (
-                            <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                            </svg>
-                          ) : (
-                            <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                          )}
-                        </button>
-                      </div>
-                      <button
-                        onClick={() => handleCopy(createdTenantData.adminCredentials.tempPassword, 'password')}
-                        className="p-2.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 transition-colors"
-                        title="Copy Password"
-                      >
-                        {copiedField === 'password' ? (
-                          <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        ) : (
-                          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                          </svg>
-                        )}
-                      </button>
-                    </div>
-                  </div>
                 </div>
 
-                {/* 48-Hour Expiry Warning */}
+                {/* Verification Notice */}
                 <div className="mt-4 flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200">
                   <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                   </svg>
                   <div className="flex-1">
-                    <p className="text-xs font-semibold text-amber-900 mb-0.5">Security Notice: 48-Hour Expiry</p>
-                    <p className="text-xs text-amber-700">This temporary password will expire in 48 hours. The administrator must login and set a permanent password immediately.</p>
+                    <p className="text-xs font-semibold text-amber-900 mb-0.5">Next Steps Required</p>
+                    <p className="text-xs text-amber-700">
+                      The administrator must verify their email before they can login. The verification link expires in 24 hours.
+                      Once verified, they will receive their login credentials.
+                    </p>
                   </div>
                 </div>
               </div>

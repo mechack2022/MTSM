@@ -186,3 +186,69 @@ export function useAbsenceReasons(includeInactive = false, tenantId?: string | n
 export function useGenders(includeInactive = false, tenantId?: string | null) {
   return useCodeSetsByGroup('GENDER', includeInactive, tenantId)
 }
+
+// ============================================================================
+// COMPREHENSIVE CODE SETS HOOK - All Reference Data
+// ============================================================================
+
+interface State {
+  id: string
+  name: string
+  code: string
+}
+
+interface LocalGovernment {
+  id: string
+  stateId: string
+  name: string
+}
+
+interface CodeSetItem {
+  id: string
+  name: string
+}
+
+interface AllCodeSets {
+  states: State[]
+  localGovernments: LocalGovernment[]
+  topologies: CodeSetItem[]
+  educationalTiers: CodeSetItem[]
+}
+
+// Static enum values
+const TOPOLOGIES: CodeSetItem[] = [
+  { id: 'COMPOSITE', name: 'COMPOSITE' },
+  { id: 'STANDALONE', name: 'STANDALONE' },
+  { id: 'SATELLITE', name: 'SATELLITE' },
+]
+
+const EDUCATIONAL_TIERS: CodeSetItem[] = [
+  { id: 'EARLY_YEARS', name: 'Early Years / Nursery (Crèche - Pre-Primary)' },
+  { id: 'PRIMARY', name: 'Primary School (Basic 1 - Basic 6)' },
+  { id: 'JUNIOR_SECONDARY', name: 'Junior Secondary (JSS1 - JSS3)' },
+  { id: 'SENIOR_SECONDARY', name: 'Senior Secondary (SS1 - SS3)' },
+]
+
+export function useCodeSets() {
+  return useQuery({
+    queryKey: ['code-sets', 'all'],
+    queryFn: async () => {
+      // Fetch states and LGAs in parallel (2 calls instead of 38!)
+      const [statesRes, lgasRes] = await Promise.all([
+        api.get<State[]>('/locations/states'),
+        api.get<LocalGovernment[]>('/locations/lgas'),
+      ])
+
+      const result: AllCodeSets = {
+        states: statesRes.data || [],
+        localGovernments: lgasRes.data || [],
+        topologies: TOPOLOGIES,
+        educationalTiers: EDUCATIONAL_TIERS,
+      }
+
+      return result
+    },
+    staleTime: 30 * 60 * 1000, // 30 minutes
+    gcTime: 60 * 60 * 1000, // 1 hour
+  })
+}

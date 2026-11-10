@@ -3,9 +3,10 @@
 // ============================================================================
 // Tenant Admin page to view and manage all schools/campuses under their trust
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/store'
+import { useTenantDashboard } from '@/hooks'
 import AddSchoolModal from '@/components/modals/AddSchoolModal'
 import toast from 'react-hot-toast'
 
@@ -28,58 +29,55 @@ interface School {
 export default function MySchoolsCampusesPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { data: dashboard, isLoading, isError } = useTenantDashboard()
   const [isAddSchoolModalOpen, setIsAddSchoolModalOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'setup' | 'deactivated'>('all')
 
-  // Dummy data
-  const schools: School[] = [
-    {
-      id: '1',
-      name: 'Crown Jewel High School',
-      category: 'Senior & Junior Secondary • WAEC / IGCSE',
-      location: 'Lekki Phase 1, Lagos',
-      campusCode: 'CJET-LEK',
-      principalName: 'Mrs. Folake Balogun',
-      principalEmail: 'folake.balogun@crownjewel-edu.ng',
-      principalPhone: '0802 334 5678',
-      enrolled: 520,
-      capacity: 600,
-      status: 'Active',
-      image: 'https://images.unsplash.com/photo-1562774053-701939374585?w=400',
+  // Transform API schools data to match component interface
+  const schools: School[] = useMemo(() => {
+    if (!dashboard?.schools) return []
+
+    return dashboard.schools.map(school => ({
+      id: school.id,
+      name: school.name,
+      category: `${school.topology} • ${school.educationalTiers.join(', ')}`,
+      location: school.physicalAddress || school.localGovernmentName || school.stateName || 'N/A',
+      campusCode: school.campusCode,
+      principalName: school.schoolHeadName || 'Not Assigned',
+      principalEmail: school.schoolHeadEmail || '',
+      principalPhone: school.schoolHeadPhone || '',
+      enrolled: school.currentStudents,
+      capacity: school.seatCapacity,
+      status: school.status === 'ACTIVE' ? 'Active' :
+              school.status === 'SUSPENDED' ? 'Deactivated' : 'Under Setup',
+      image: 'https://images.unsplash.com/photo-1562774053-701939374585?w=400', // Default placeholder
       verified: true,
-    },
-    {
-      id: '2',
-      name: 'Crown Jewel Preparatory',
-      category: 'Early Years & Primary • Crèche to Basic 6',
-      location: 'GRA Ikeja, Lagos',
-      campusCode: 'CJET-IKJ',
-      principalName: 'Mr. Kenneth Okafor',
-      principalEmail: 'k.okafor@crownjewel-edu.ng',
-      principalPhone: '0803 555 8901',
-      enrolled: 382,
-      capacity: 500,
-      status: 'Active',
-      image: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400',
-      verified: true,
-    },
-    {
-      id: '3',
-      name: 'Crown Jewel Academy',
-      category: 'Comprehensive All-Through K-12',
-      location: 'Guzape District, Abuja FCT',
-      campusCode: 'CJET-ABJ',
-      principalName: 'Dr. Amina Bello',
-      principalEmail: 'amina.bello@crownjewel-edu.ng',
-      principalPhone: '0814 222 3456',
-      enrolled: 240,
-      capacity: 400,
-      status: 'Active',
-      image: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=400',
-      verified: true,
-    },
-  ]
+    }))
+  }, [dashboard?.schools])
+
+  // Calculate metrics from real data
+  const activeTerritoriesCount = useMemo(() => {
+    if (!dashboard?.schools) return 0
+    const uniqueStates = new Set(dashboard.schools
+      .map(s => s.stateName)
+      .filter(Boolean))
+    return uniqueStates.size
+  }, [dashboard?.schools])
+
+  const leadershipCount = useMemo(() => {
+    if (!dashboard?.schools) return 0
+    return dashboard.schools.filter(s => s.schoolHeadName).length
+  }, [dashboard?.schools])
+
+  const territoryNames = useMemo(() => {
+    if (!dashboard?.schools) return ''
+    const locations = dashboard.schools
+      .map(s => s.localGovernmentName || s.stateName)
+      .filter(Boolean)
+      .slice(0, 3)
+    return locations.join(', ')
+  }, [dashboard?.schools])
 
   const handleAddSchoolSubmit = (data: any) => {
     console.log('New school/campus data:', data)
@@ -133,8 +131,8 @@ export default function MySchoolsCampusesPage() {
                 </svg>
               </div>
               <div className="flex flex-col overflow-hidden">
-                <span className="text-xs font-semibold text-gray-900 truncate">CJET TRUST</span>
-                <span className="text-[11px] text-gray-600 truncate">Crown Jewel Trust</span>
+                <span className="text-xs font-semibold text-gray-900 truncate">{dashboard?.tenantCode || 'N/A'}</span>
+                <span className="text-[11px] text-gray-600 truncate">{dashboard?.tenantName || 'Loading...'}</span>
               </div>
             </div>
           </div>
@@ -207,19 +205,21 @@ export default function MySchoolsCampusesPage() {
         <div className="p-4">
           <div className="p-4 rounded-xl bg-gray-50 shadow-sm flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <span className="text-[9px] uppercase text-blue-600 font-bold tracking-wider">Enterprise Tier</span>
-              <span className="text-[9px] text-green-700 bg-green-100 px-2 py-0.5 rounded-full font-bold">3 Active</span>
+              <span className="text-[9px] uppercase text-blue-600 font-bold tracking-wider">{dashboard?.subscriptionTier || 'Standard'} Tier</span>
+              <span className="text-[9px] text-green-700 bg-green-100 px-2 py-0.5 rounded-full font-bold">{dashboard?.statistics.activeSchools || 0} Active</span>
             </div>
             <div className="flex flex-col">
               <span className="text-lg font-semibold text-gray-900">
-                {totalEnrolled} <span className="text-xs text-gray-600 font-normal">/ {totalCapacity}</span>
+                {dashboard?.statistics.totalCurrentStudents || 0} <span className="text-xs text-gray-600 font-normal">/ {dashboard?.studentQuota || 0}</span>
               </span>
               <span className="text-xs text-gray-600">Total Student Quota</span>
             </div>
             <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
-              <div className="bg-blue-600 h-full rounded-full transition-all" style={{ width: `${utilizationPercent}%` }}></div>
+              <div className="bg-blue-600 h-full rounded-full transition-all" style={{ width: `${dashboard?.statistics.quotaUsageRate || 0}%` }}></div>
             </div>
-            <span className="text-xs text-gray-600">Renewal: Nov 2025</span>
+            <span className="text-xs text-gray-600">
+              Renewal: {dashboard?.subscriptionEndDate ? new Date(dashboard.subscriptionEndDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'N/A'}
+            </span>
           </div>
         </div>
       </aside>
@@ -233,7 +233,7 @@ export default function MySchoolsCampusesPage() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
-              <span className="text-[11px] font-semibold tracking-wide">Crown Jewel Education Trust • Proprietor</span>
+              <span className="text-[11px] font-semibold tracking-wide">{dashboard?.tenantName || 'Loading...'} • Proprietor</span>
             </div>
             <div className="hidden xl:flex items-center gap-2 bg-gray-50 px-4 py-1.5 rounded-lg text-gray-600">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -265,8 +265,8 @@ export default function MySchoolsCampusesPage() {
 
             <div className="flex items-center gap-2 pl-2">
               <div className="flex flex-col text-right hidden sm:flex">
-                <span className="text-sm font-semibold text-gray-900 leading-tight">Dr. Aliyu Mohammed</span>
-                <span className="text-xs text-gray-600 leading-none">Lead Proprietor</span>
+                <span className="text-sm font-semibold text-gray-900 leading-tight">{dashboard?.contactName || user?.fullName || 'Admin'}</span>
+                <span className="text-xs text-gray-600 leading-none">{dashboard?.roleTitle || 'Lead Proprietor'}</span>
               </div>
               <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
                 <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -309,7 +309,7 @@ export default function MySchoolsCampusesPage() {
                     </span>
                   </div>
                   <p className="text-sm text-gray-600 max-w-2xl">
-                    View, add, update, and manage operational schools under Crown Jewel Education Trust. Real-time offline-first sync enabled.
+                    View, add, update, and manage operational schools under {dashboard?.tenantName || 'your organization'}. Real-time offline-first sync enabled.
                   </p>
                 </div>
 
@@ -341,7 +341,7 @@ export default function MySchoolsCampusesPage() {
                     <div className="flex flex-col">
                       <span className="text-[9px] uppercase tracking-wider text-gray-600 font-bold">Institutions</span>
                       <div className="flex items-baseline gap-2 mt-1">
-                        <span className="text-4xl font-bold text-gray-900">3</span>
+                        <span className="text-4xl font-bold text-gray-900">{dashboard?.statistics.totalSchools || 0}</span>
                         <span className="text-xs text-green-600 font-semibold">Active</span>
                       </div>
                     </div>
@@ -353,7 +353,7 @@ export default function MySchoolsCampusesPage() {
                   </div>
                   <div className="mt-4 flex items-center gap-1.5 text-gray-600 text-xs bg-gray-50 px-2 py-1 rounded">
                     <span className="w-2 h-2 rounded-full bg-green-600"></span>
-                    <span>All 3 campuses synchronized</span>
+                    <span>All {dashboard?.statistics.activeSchools || 0} campuses synchronized</span>
                   </div>
                 </div>
 
@@ -363,8 +363,8 @@ export default function MySchoolsCampusesPage() {
                     <div className="flex flex-col">
                       <span className="text-[9px] uppercase tracking-wider text-gray-600 font-bold">Total Enrolled</span>
                       <div className="flex items-baseline gap-1.5 mt-1">
-                        <span className="text-4xl font-bold text-blue-600">{totalEnrolled}</span>
-                        <span className="text-xs text-gray-600">/ {totalCapacity}</span>
+                        <span className="text-4xl font-bold text-blue-600">{dashboard?.statistics.totalCurrentStudents || 0}</span>
+                        <span className="text-xs text-gray-600">/ {dashboard?.statistics.totalSeatCapacity || 0}</span>
                       </div>
                     </div>
                     <div className="w-10 h-10 rounded-lg bg-blue-100/40 text-blue-600 flex items-center justify-center">
@@ -375,11 +375,11 @@ export default function MySchoolsCampusesPage() {
                   </div>
                   <div className="mt-4">
                     <div className="flex justify-between items-center text-xs mb-1">
-                      <span className="text-green-600 font-medium">{utilizationPercent.toFixed(1)}% Quota consumed</span>
-                      <span className="text-gray-600">{totalCapacity - totalEnrolled} seats left</span>
+                      <span className="text-green-600 font-medium">{dashboard?.statistics.occupancyRate.toFixed(1) || '0.0'}% Quota consumed</span>
+                      <span className="text-gray-600">{dashboard?.statistics.availableSeats || 0} seats left</span>
                     </div>
                     <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
-                      <div className="bg-blue-600 h-full rounded-full transition-all" style={{ width: `${utilizationPercent}%` }}></div>
+                      <div className="bg-blue-600 h-full rounded-full transition-all" style={{ width: `${dashboard?.statistics.occupancyRate || 0}%` }}></div>
                     </div>
                   </div>
                 </div>
@@ -390,7 +390,7 @@ export default function MySchoolsCampusesPage() {
                     <div className="flex flex-col">
                       <span className="text-[9px] uppercase tracking-wider text-gray-600 font-bold">Leadership</span>
                       <div className="flex items-baseline gap-2 mt-1">
-                        <span className="text-4xl font-bold text-gray-900">3</span>
+                        <span className="text-4xl font-bold text-gray-900">{leadershipCount}</span>
                         <span className="text-xs text-gray-600">Principals</span>
                       </div>
                     </div>
@@ -414,7 +414,7 @@ export default function MySchoolsCampusesPage() {
                     <div className="flex flex-col">
                       <span className="text-[9px] uppercase tracking-wider text-gray-600 font-bold">Active Territories</span>
                       <div className="flex items-baseline gap-2 mt-1">
-                        <span className="text-4xl font-bold text-gray-900">2</span>
+                        <span className="text-4xl font-bold text-gray-900">{activeTerritoriesCount}</span>
                         <span className="text-xs text-gray-600">States</span>
                       </div>
                     </div>
@@ -429,7 +429,7 @@ export default function MySchoolsCampusesPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
-                    <span className="truncate">Lekki Ph 1, Ikeja GRA, Guzape</span>
+                    <span className="truncate">{territoryNames || 'N/A'}</span>
                   </div>
                 </div>
               </div>
@@ -633,7 +633,7 @@ export default function MySchoolsCampusesPage() {
                     <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>
-                    <span>Showing <strong className="text-gray-900 font-semibold">{filteredSchools.length} of {schools.length}</strong> schools registered under Crown Jewel Education Trust</span>
+                    <span>Showing <strong className="text-gray-900 font-semibold">{filteredSchools.length} of {schools.length}</strong> schools registered under {dashboard?.tenantName || 'your organization'}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <button className="px-3 py-1 rounded bg-gray-200 text-gray-400 text-xs cursor-not-allowed" disabled>

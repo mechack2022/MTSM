@@ -29,6 +29,13 @@ public class LocationController {
         return ResponseEntity.ok(locationService.getAllStates());
     }
 
+    @GetMapping("/lgas")
+    @Operation(summary = "Get all LGAs", description = "Returns all Local Government Areas across all states")
+    public ResponseEntity<List<LocalGovernmentResponse>> getAllLGAs() {
+        log.info("REST request to get all LGAs");
+        return ResponseEntity.ok(locationService.getAllLGAs());
+    }
+
     @GetMapping("/states/{stateId}")
     @Operation(summary = "Get state by ID", description = "Returns a single state by its UUID")
     public ResponseEntity<StateResponse> getStateById(@PathVariable UUID stateId) {

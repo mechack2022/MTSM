@@ -4,10 +4,12 @@
 // Comprehensive form for tenant admins to update school information,
 // leadership, capacity, and manage school lifecycle
 
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '@/store'
+import { useTenantDashboard, useCodeSets } from '@/hooks'
 import toast from 'react-hot-toast'
+import api from '@/lib/api-client'
 
 // ============================================================================
 // COMPONENT
@@ -17,31 +19,141 @@ export default function UpdateSchoolPage() {
   const navigate = useNavigate()
   const { schoolId } = useParams()
   const { user } = useAuth()
+  const { data: dashboard, isLoading } = useTenantDashboard()
+
+  // Fetch code sets
+  const { data: codeSets } = useCodeSets()
+
+  // Find the specific school from dashboard
+  const school = useMemo(() => {
+    return dashboard?.schools.find(s => s.id === schoolId)
+  }, [dashboard?.schools, schoolId])
 
   // Form state
-  const [schoolName, setSchoolName] = useState('Crown Jewel High School – Lekki Campus')
-  const [educationalLevel, setEducationalLevel] = useState('Secondary School (JSS1 – SS3, WAEC/NERDC & Cambridge IGCSE)')
-  const [physicalAddress, setPhysicalAddress] = useState('Plot 8 Block B, Admiralty Way, Lekki Phase 1, Lagos')
-  const [stateLga, setStateLga] = useState('Lagos State • Eti-Osa LGA')
-  const [officialEmail, setOfficialEmail] = useState('lekki@crownjewel-edu.ng')
-  const [phoneNumber, setPhoneNumber] = useState('+234 802 334 5678')
-  const [capacity, setCapacity] = useState(600)
+  const [schoolName, setSchoolName] = useState('')
+  const [topology, setTopology] = useState('')
+  const [educationalTiers, setEducationalTiers] = useState<string[]>([])
+  const [physicalAddress, setPhysicalAddress] = useState('')
+  const [selectedStateId, setSelectedStateId] = useState('')
+  const [selectedLgaId, setSelectedLgaId] = useState('')
+  const [officialEmail, setOfficialEmail] = useState('')
+  const [phoneNumber, setPhoneNumber] = useState('')
+  const [capacity, setCapacity] = useState(0)
   const [isSaving, setIsSaving] = useState(false)
 
-  // School data
-  const campusCode = 'CJET-LEK'
-  const currentEnrolled = 520
-  const utilizationPercent = ((currentEnrolled / capacity) * 100).toFixed(1)
+  // Get states and LGAs from code sets
+  const states = codeSets?.states || []
+  const topologies = codeSets?.topologies || []
+  const tiers = codeSets?.educationalTiers || []
+
+  // Filter LGAs based on selected state
+  const localGovernments = useMemo(() => {
+    if (!selectedStateId || !codeSets?.localGovernments) return []
+    return codeSets.localGovernments.filter(lga => lga.stateId === selectedStateId)
+  }, [selectedStateId, codeSets?.localGovernments])
+
+  // Populate form fields when school data is available
+  useEffect(() => {
+    if (school && codeSets) {
+      setSchoolName(school.name)
+      setTopology(school.topology)
+
+      // Always use the persisted educational tiers from the database
+      // They are already correctly saved for both COMPOSITE and STANDALONE
+      setEducationalTiers(school.educationalTiers)
+
+      setPhysicalAddress(school.physicalAddress || '')
+
+      // Find state ID from state name
+      const state = states.find(s => s.name === school.stateName)
+      if (state) {
+        setSelectedStateId(state.id)
+
+        // Find LGA ID from LGA name - wait for state to be set
+        setTimeout(() => {
+          const lga = codeSets.localGovernments?.find(
+            l => l.name === school.localGovernmentName && l.stateId === state.id
+          )
+          if (lga) {
+            setSelectedLgaId(lga.id)
+          }
+        }, 0)
+      }
+
+      setOfficialEmail('') // Not available in API
+      setPhoneNumber('') // Not available in API
+      setCapacity(school.seatCapacity)
+    }
+  }, [school, codeSets, states])
+
+  // Auto-select all tiers when user CHANGES topology to COMPOSITE
+  // This only triggers when the user actively changes the dropdown
+  useEffect(() => {
+    // Only auto-select if we have tiers loaded and topology was changed by user
+    // Skip if this is the initial load (school data matches topology)
+    if (topology === 'COMPOSITE' && tiers.length > 0 && school && topology !== school.topology) {
+      setEducationalTiers(tiers.map(t => t.id))
+    }
+  }, [topology, tiers, school])
+
+  // School data calculations
+  const campusCode = school?.campusCode || 'N/A'
+  const currentEnrolled = school?.currentStudents || 0
+  const utilizationPercent = capacity > 0 ? ((currentEnrolled / capacity) * 100).toFixed(1) : '0'
   const remainingSeats = capacity - currentEnrolled
 
   const handleSave = async () => {
-    setIsSaving(true)
+    try {
+      setIsSaving(true)
 
-    // Simulate save operation
-    await new Promise(resolve => setTimeout(resolve, 700))
+      // Validate required fields
+      if (!schoolName.trim()) {
+        toast.error('School name is required')
+        return
+      }
+      if (!selectedStateId) {
+        toast.error('Please select a state')
+        return
+      }
+      if (!selectedLgaId) {
+        toast.error('Please select a local government area')
+        return
+      }
+      if (!topology) {
+        toast.error('Please select a topology')
+        return
+      }
+      if (educationalTiers.length === 0) {
+        toast.error('Please select at least one educational tier')
+        return
+      }
 
-    setIsSaving(false)
-    toast.success('Campus Updated - Lekki Campus details synced with GovCloud')
+      // Prepare update data
+      const updateData = {
+        name: schoolName.trim(),
+        topology,
+        educationalTiers,
+        physicalAddress: physicalAddress.trim() || null,
+        stateId: selectedStateId,
+        localGovernmentId: selectedLgaId,
+        seatCapacity: capacity,
+      }
+
+      // Call API to update school
+      await api.put(`/schools/${schoolId}`, updateData)
+
+      toast.success(`${schoolName} updated successfully!`)
+
+      // Optionally navigate back to schools list after a delay
+      setTimeout(() => {
+        navigate('/tenant-admin/my-schools-campuses')
+      }, 1500)
+    } catch (error: any) {
+      console.error('Error updating school:', error)
+      toast.error(error?.response?.data?.message || 'Failed to update school. Please try again.')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleDeactivate = () => {
@@ -83,8 +195,8 @@ export default function UpdateSchoolPage() {
                 </svg>
               </div>
               <div className="flex flex-col overflow-hidden">
-                <span className="text-xs font-bold text-gray-900 truncate">CJET TRUST</span>
-                <span className="text-xs text-gray-600 truncate">Crown Jewel Trust</span>
+                <span className="text-xs font-bold text-gray-900 truncate">{dashboard?.tenantCode || 'Loading...'}</span>
+                <span className="text-xs text-gray-600 truncate">{dashboard?.tenantName || 'Loading...'}</span>
               </div>
             </div>
           </div>
@@ -149,20 +261,20 @@ export default function UpdateSchoolPage() {
         </div>
 
         {/* Bottom Plan Info */}
-        <div class="p-4">
-          <div class="p-4 rounded-xl bg-gray-50 shadow-sm flex flex-col gap-1">
-            <div class="flex items-center justify-between">
-              <span class="text-[11px] font-bold uppercase text-blue-600 tracking-wider">Enterprise Tier</span>
-              <span class="text-[11px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">3 Active</span>
+        <div className="p-4">
+          <div className="p-4 rounded-xl bg-gray-50 shadow-sm flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase text-blue-600 tracking-wider">{dashboard?.subscriptionTier || 'Loading...'}</span>
+              <span className="text-[11px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{dashboard?.statistics.activeSchools || 0} Active</span>
             </div>
-            <div class="flex flex-col mt-1">
-              <span class="text-lg font-semibold text-gray-900">1,142 <span class="text-xs text-gray-600 font-normal">/ 1,500</span></span>
-              <span class="text-xs text-gray-600">Total Student Quota</span>
+            <div className="flex flex-col mt-1">
+              <span className="text-lg font-semibold text-gray-900">{dashboard?.statistics.totalCurrentStudents || 0} <span className="text-xs text-gray-600 font-normal">/ {dashboard?.studentQuota || 0}</span></span>
+              <span className="text-xs text-gray-600">Total Student Quota</span>
             </div>
-            <div class="w-full bg-gray-200 h-2 rounded-full overflow-hidden mt-1">
-              <div class="bg-blue-600 h-full rounded-full" style={{ width: '76.1%' }}></div>
+            <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden mt-1">
+              <div className="bg-blue-600 h-full rounded-full" style={{ width: `${dashboard?.statistics.quotaUsageRate || 0}%` }}></div>
             </div>
-            <span class="text-xs text-gray-600 mt-1">Renewal: Nov 2025</span>
+            <span className="text-xs text-gray-600 mt-1">Renewal: {dashboard?.subscriptionEndDate ? new Date(dashboard.subscriptionEndDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'N/A'}</span>
           </div>
         </div>
       </aside>
@@ -176,7 +288,7 @@ export default function UpdateSchoolPage() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
-              <span className="text-[11px] font-semibold">Crown Jewel Education Trust • Proprietor</span>
+              <span className="text-[11px] font-semibold">{dashboard?.tenantName || 'Loading...'} • Proprietor</span>
             </div>
             <div className="hidden xl:flex items-center gap-2 bg-gray-50 px-4 py-1.5 rounded-lg text-gray-600">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -204,8 +316,8 @@ export default function UpdateSchoolPage() {
 
             <div className="flex items-center gap-2 pl-2">
               <div className="flex flex-col text-right hidden sm:flex">
-                <span className="text-sm font-semibold text-gray-900 leading-tight">Dr. Aliyu Mohammed</span>
-                <span className="text-xs text-gray-600 leading-none">Lead Proprietor</span>
+                <span className="text-sm font-semibold text-gray-900 leading-tight">{dashboard?.contactName || user?.fullName || 'Admin'}</span>
+                <span className="text-xs text-gray-600 leading-none">{dashboard?.roleTitle || 'Lead Proprietor'}</span>
               </div>
               <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
                 <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -237,7 +349,7 @@ export default function UpdateSchoolPage() {
                   <span>My Schools & Campuses</span>
                 </button>
                 <span className="text-gray-400">/</span>
-                <span className="text-gray-900 font-medium">Crown Jewel High School – Lekki</span>
+                <span className="text-gray-900 font-medium">{school?.name || 'Loading...'}</span>
                 <span className="text-gray-400">/</span>
                 <span className="text-blue-600 font-semibold">Update Details</span>
               </nav>
@@ -255,9 +367,17 @@ export default function UpdateSchoolPage() {
                       </svg>
                       <span>Back to Schools</span>
                     </button>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-[11px] font-bold shadow-sm">
-                      <span className="w-2 h-2 rounded-full bg-green-600 animate-pulse"></span>
-                      Active Campus
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold shadow-sm ${
+                      school?.status === 'ACTIVE' ? 'bg-green-100 text-green-700' :
+                      school?.status === 'SUSPENDED' ? 'bg-red-100 text-red-700' :
+                      'bg-gray-100 text-gray-700'
+                    }`}>
+                      <span className={`w-2 h-2 rounded-full ${
+                        school?.status === 'ACTIVE' ? 'bg-green-600 animate-pulse' :
+                        school?.status === 'SUSPENDED' ? 'bg-red-600' :
+                        'bg-gray-600'
+                      }`}></span>
+                      {school?.status === 'ACTIVE' ? 'Active Campus' : school?.status === 'SUSPENDED' ? 'Suspended' : 'Under Setup'}
                     </span>
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-gray-100 text-blue-600 text-[11px] font-bold">
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -267,7 +387,7 @@ export default function UpdateSchoolPage() {
                     </span>
                   </div>
                   <h1 className="text-3xl font-bold text-gray-900 tracking-tight mt-1">
-                    Update School: <span className="text-blue-600">Crown Jewel High School – Lekki</span>
+                    Update School: <span className="text-blue-600">{school?.name || 'Loading...'}</span>
                   </h1>
                 </div>
 
@@ -371,19 +491,51 @@ export default function UpdateSchoolPage() {
                       </div>
                     </div>
 
-                    {/* Educational Level */}
+                    {/* Topology */}
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold text-gray-900">Category / Educational Level</label>
+                      <label className="text-xs font-semibold text-gray-900">School Topology</label>
                       <div className="flex items-center bg-gray-50 px-4 py-2.5 rounded-xl focus-within:bg-white focus-within:shadow-md transition-all">
                         <svg className="w-5 h-5 text-gray-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
                         </svg>
-                        <input
+                        <select
                           className="w-full bg-transparent text-sm text-gray-900 outline-none"
-                          type="text"
-                          value={educationalLevel}
-                          onChange={(e) => setEducationalLevel(e.target.value)}
-                        />
+                          value={topology}
+                          onChange={(e) => setTopology(e.target.value)}
+                        >
+                          <option value="">Select Topology</option>
+                          {topologies.map((t) => (
+                            <option key={t.id} value={t.name}>
+                              {t.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Educational Tiers */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-gray-900">Educational Tiers</label>
+                      <div className="bg-gray-50 px-4 py-2.5 rounded-xl focus-within:bg-white focus-within:shadow-md transition-all">
+                        <div className="flex flex-wrap gap-2">
+                          {tiers.map((tier) => (
+                            <label key={tier.id} className="flex items-center gap-1.5 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                checked={educationalTiers.includes(tier.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setEducationalTiers([...educationalTiers, tier.id])
+                                  } else {
+                                    setEducationalTiers(educationalTiers.filter(t => t !== tier.id))
+                                  }
+                                }}
+                              />
+                              <span className="text-sm text-gray-900">{tier.name}</span>
+                            </label>
+                          ))}
+                        </div>
                       </div>
                     </div>
 
@@ -404,19 +556,52 @@ export default function UpdateSchoolPage() {
                       </div>
                     </div>
 
-                    {/* State & LGA */}
+                    {/* State */}
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold text-gray-900">State & Local Government Area (LGA)</label>
+                      <label className="text-xs font-semibold text-gray-900">State</label>
                       <div className="flex items-center bg-gray-50 px-4 py-2.5 rounded-xl focus-within:bg-white focus-within:shadow-md transition-all">
                         <svg className="w-5 h-5 text-gray-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
                         </svg>
-                        <input
+                        <select
                           className="w-full bg-transparent text-sm text-gray-900 outline-none"
-                          type="text"
-                          value={stateLga}
-                          onChange={(e) => setStateLga(e.target.value)}
-                        />
+                          value={selectedStateId}
+                          onChange={(e) => {
+                            setSelectedStateId(e.target.value)
+                            setSelectedLgaId('') // Reset LGA when state changes
+                          }}
+                        >
+                          <option value="">Select State</option>
+                          {states.map((state) => (
+                            <option key={state.id} value={state.id}>
+                              {state.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Local Government Area */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-gray-900">Local Government Area (LGA)</label>
+                      <div className="flex items-center bg-gray-50 px-4 py-2.5 rounded-xl focus-within:bg-white focus-within:shadow-md transition-all">
+                        <svg className="w-5 h-5 text-gray-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <select
+                          className="w-full bg-transparent text-sm text-gray-900 outline-none"
+                          value={selectedLgaId}
+                          onChange={(e) => setSelectedLgaId(e.target.value)}
+                          disabled={!selectedStateId}
+                        >
+                          <option value="">Select LGA</option>
+                          {localGovernments.map((lga) => (
+                            <option key={lga.id} value={lga.id}>
+                              {lga.name}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
 
@@ -471,41 +656,42 @@ export default function UpdateSchoolPage() {
                     <span className="text-[11px] font-bold uppercase text-green-700 bg-green-100 px-2 py-1 rounded-full">Principal Level</span>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-gray-50">
-                    <div className="flex items-center gap-4">
-                      <div className="relative">
-                        <div className="w-16 h-16 rounded-full bg-gray-200 overflow-hidden shadow-sm">
-                          <img
-                            className="w-full h-full object-cover"
-                            src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&h=100&fit=crop"
-                            alt="Mrs. Folake Balogun"
-                          />
+                  {school?.schoolHeadName ? (
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-gray-50">
+                      <div className="flex items-center gap-4">
+                        <div className="relative">
+                          <div className="w-16 h-16 rounded-full bg-gray-200 overflow-hidden shadow-sm">
+                            <img
+                              className="w-full h-full object-cover"
+                              src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&h=100&fit=crop"
+                              alt={school.schoolHeadName}
+                            />
+                          </div>
+                          <span className="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-green-600 ring-2 ring-white" title="Active Account"></span>
                         </div>
-                        <span className="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-green-600 ring-2 ring-white" title="Active Account"></span>
-                      </div>
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg font-semibold text-gray-900">Mrs. Folake Balogun</span>
-                          <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                          </svg>
-                        </div>
-                        <div className="flex flex-col text-gray-600 text-sm mt-0.5">
-                          <span className="flex items-center gap-1.5">
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg font-semibold text-gray-900">{school.schoolHeadName}</span>
+                            <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                             </svg>
-                            folake.balogun@crownjewel-edu.ng
-                          </span>
-                          <span className="flex items-center gap-1.5">
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                            </svg>
-                            +234 802 334 5678
-                          </span>
+                          </div>
+                          <div className="flex flex-col text-gray-600 text-sm mt-0.5">
+                            <span className="flex items-center gap-1.5">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                              </svg>
+                              {school.schoolHeadEmail || 'N/A'}
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                              </svg>
+                              {school.schoolHeadPhone || 'N/A'}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
                     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                       <button className="px-4 py-2 rounded-xl bg-white text-gray-900 hover:bg-gray-100 text-xs font-semibold shadow-sm transition-all flex items-center justify-center gap-1.5">
@@ -521,7 +707,13 @@ export default function UpdateSchoolPage() {
                         <span>Reset Credentials</span>
                       </button>
                     </div>
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-xl bg-amber-50 text-amber-900 text-sm">
+                      <p className="font-medium">No School Head Assigned</p>
+                      <p className="text-xs text-amber-700 mt-1">Please assign a principal or school head to this campus for proper administration.</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* CARD 3: Capacity & Quota */}

@@ -35,6 +35,16 @@ public class LocationService {
     }
 
     /**
+     * Get all Local Government Areas across all states
+     */
+    public List<LocalGovernmentResponse> getAllLGAs() {
+        log.debug("Fetching all LGAs");
+        return localGovernmentRepository.findAll().stream()
+                .map(this::mapToLGAResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
      * Get all LGAs for a specific state
      */
     public List<LocalGovernmentResponse> getLGAsByStateId(UUID stateId) {

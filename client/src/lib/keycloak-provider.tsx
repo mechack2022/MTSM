@@ -2,6 +2,8 @@ import { ReactNode, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import keycloak from './keycloak'
 import { useAppStore } from '@/store'
+import api from './api-client'
+import type { Tenant } from '@/types'
 
 interface KeycloakProviderProps {
   children: ReactNode
@@ -12,6 +14,36 @@ export function KeycloakProvider({ children }: KeycloakProviderProps) {
   const navigate = useNavigate()
   const setAuth = useAppStore((state) => state.setAuth)
   const clearAuth = useAppStore((state) => state.clearAuth)
+
+  // Fetch tenant data from backend
+  const fetchTenantData = async (tenantId: string, user: any, token: string, refreshToken?: string) => {
+    try {
+      console.log('Fetching tenant data for tenant ID:', tenantId)
+      // Use /tenants/me endpoint which is accessible by tenant_admin role
+      const response = await api.get<Tenant>(`/tenants/me`)
+      const tenantData = response.data
+
+      console.log('Tenant data fetched successfully:', tenantData)
+
+      setAuth({
+        user,
+        token,
+        refreshToken,
+        tenant: tenantData,
+        assignedSchools: [],
+      })
+    } catch (error) {
+      console.error('Failed to fetch tenant data:', error)
+      // Set auth anyway without tenant data
+      setAuth({
+        user,
+        token,
+        refreshToken,
+        tenant: null,
+        assignedSchools: [],
+      })
+    }
+  }
 
   useEffect(() => {
     // Initialize Keycloak with Authorization Code + PKCE flow
@@ -54,6 +86,9 @@ export function KeycloakProvider({ children }: KeycloakProviderProps) {
             updatedAt: new Date().toISOString(),
           }
 
+          // DISABLED: Fetching tenant data causes infinite loop
+          // Even though JWT has tenant_id, the /tenants/me endpoint might not be ready
+          // Backend will use tenant_id from JWT directly, so we don't need to fetch it here
           setAuth({
             user,
             token: keycloak.token,

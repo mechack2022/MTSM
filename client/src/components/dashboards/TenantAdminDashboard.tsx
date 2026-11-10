@@ -1,12 +1,29 @@
+import { useTenant } from '@/hooks/use-tenants'
+import { useSchools, useSchoolStats } from '@/hooks/use-schools'
+
 export default function TenantAdminDashboard() {
+  // TEMPORARY: Disabled useTenant() to fix infinite loop
+  // const { data: tenant, isLoading: tenantLoading } = useTenant()
+  const tenant = null
+  const tenantLoading = false
+
+  const { data: schools = [], isLoading: schoolsLoading } = useSchools()
+  const { activeSchoolCount, totalStudents, totalTeachers, isLoading: statsLoading } = useSchoolStats()
+
+  const isLoading = tenantLoading || schoolsLoading || statsLoading
+
   return (
     <div className="space-y-6">
       {/* Header Section */}
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Welcome, Chief Dr. O. Alabi</h2>
-          <p className="text-gray-600">Proprietor & Governing Board Chair</p>
-          <p className="text-sm text-gray-500">Educational Operations | Lagos LG, Area IV, FCT III, Port Harcourt LG</p>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+            {isLoading ? 'Loading...' : `Welcome, ${tenant?.contactName || 'Admin'}`}
+          </h2>
+          <p className="text-gray-600">{tenant?.roleTitle || 'Tenant Administrator'}</p>
+          <p className="text-sm text-gray-500">
+            {tenant?.name || 'Loading organization...'} | {tenant?.stateName || 'Location'} | {tenant?.localGovernmentName || 'LG'}
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right">
@@ -56,21 +73,15 @@ export default function TenantAdminDashboard() {
             </svg>
           </div>
           <div className="flex items-baseline gap-2 mb-1">
-            <h3 className="text-4xl font-bold text-gray-900">4,120</h3>
-            <span className="text-green-600 text-sm font-medium">+4.3%</span>
+            <h3 className="text-4xl font-bold text-gray-900">
+              {isLoading ? '...' : totalStudents.toLocaleString()}
+            </h3>
+            <span className="text-gray-500 text-sm">Students</span>
           </div>
           <div className="flex items-center gap-3 text-xs text-gray-600 mt-3">
             <div>
-              <p className="text-gray-500">Oct-Dec</p>
-              <p className="font-semibold">280</p>
-            </div>
-            <div>
-              <p className="text-gray-500">Nov 7</p>
-              <p className="font-semibold">1,840</p>
-            </div>
-            <div>
-              <p className="text-gray-500">1ST / Reporting</p>
-              <p className="font-semibold">2,000</p>
+              <p className="text-gray-500">Across</p>
+              <p className="font-semibold">{activeSchoolCount} {activeSchoolCount === 1 ? 'Campus' : 'Campuses'}</p>
             </div>
           </div>
         </div>
@@ -112,17 +123,15 @@ export default function TenantAdminDashboard() {
             </svg>
           </div>
           <div className="flex items-baseline gap-2 mb-1">
-            <h3 className="text-4xl font-bold text-gray-900">218</h3>
-            <span className="text-green-600 text-sm font-medium">Staff Total</span>
+            <h3 className="text-4xl font-bold text-gray-900">
+              {isLoading ? '...' : totalTeachers.toLocaleString()}
+            </h3>
+            <span className="text-gray-500 text-sm">Teachers</span>
           </div>
           <div className="mt-3 space-y-1.5 text-xs">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-              <span className="text-gray-600">67% Teachers &</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-teal-500 rounded-full"></span>
-              <span className="text-gray-600">33% Support</span>
+              <span className="text-gray-600">Across {activeSchoolCount} {activeSchoolCount === 1 ? 'Campus' : 'Campuses'}</span>
             </div>
           </div>
         </div>

@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import api from '@/lib/api-client'
 import { queryKeys } from '@/lib/query-client'
-import type { School, CreateSchoolRequest, UpdateSchoolRequest } from '@/types'
+import type { School, CreateSchoolRequest, UpdateSchoolRequest } from '@/types/school'
 
 // ============================================================================
 // QUERY HOOKS
@@ -87,4 +87,45 @@ export function useUpdateSchool() {
       toast.error(error?.message || 'Failed to update school')
     },
   })
+}
+
+// ============================================================================
+// STATISTICS HOOKS
+// ============================================================================
+
+export function useSchoolStats() {
+  const activeSchoolsQuery = useQuery({
+    queryKey: ['schools', 'stats', 'active-count'],
+    queryFn: async () => {
+      const response = await api.get<number>('/schools/stats/active-count')
+      return response.data!
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+
+  const totalStudentsQuery = useQuery({
+    queryKey: ['schools', 'stats', 'total-students'],
+    queryFn: async () => {
+      const response = await api.get<number>('/schools/stats/total-students')
+      return response.data!
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+
+  const totalTeachersQuery = useQuery({
+    queryKey: ['schools', 'stats', 'total-teachers'],
+    queryFn: async () => {
+      const response = await api.get<number>('/schools/stats/total-teachers')
+      return response.data!
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+
+  return {
+    activeSchoolCount: activeSchoolsQuery.data ?? 0,
+    totalStudents: totalStudentsQuery.data ?? 0,
+    totalTeachers: totalTeachersQuery.data ?? 0,
+    isLoading: activeSchoolsQuery.isLoading || totalStudentsQuery.isLoading || totalTeachersQuery.isLoading,
+    isError: activeSchoolsQuery.isError || totalStudentsQuery.isError || totalTeachersQuery.isError,
+  }
 }

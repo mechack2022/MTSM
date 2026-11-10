@@ -4,19 +4,46 @@
 // Modal for tenant admins to add a new school/campus branch to their trust
 
 import { useState } from 'react'
+import { useTenant } from '@/hooks/use-tenants'
+import { useStates, useLocalGovernments } from '@/hooks/use-locations'
+import { useCreateSchool } from '@/hooks/use-schools'
+import { Topology } from '@/types/school'
+
+// Educational Tier Enum (matches backend)
+export enum EducationalTier {
+  EARLY_YEARS = 'EARLY_YEARS',
+  PRIMARY = 'PRIMARY',
+  JUNIOR_SECONDARY = 'JUNIOR_SECONDARY',
+  SENIOR_SECONDARY = 'SENIOR_SECONDARY',
+}
+
+// Display names for educational tiers
+const EDUCATIONAL_TIER_LABELS: Record<EducationalTier, string> = {
+  [EducationalTier.EARLY_YEARS]: 'Early Years / Nursery (Crèche - Pre-Primary)',
+  [EducationalTier.PRIMARY]: 'Primary School (Basic 1 - Basic 6)',
+  [EducationalTier.JUNIOR_SECONDARY]: 'Junior Secondary (JSS1 - JSS3)',
+  [EducationalTier.SENIOR_SECONDARY]: 'Senior Secondary (SS1 - SS3)',
+}
 
 interface AddSchoolModalProps {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (data: any) => void
 }
 
-export default function AddSchoolModal({ isOpen, onClose, onSubmit }: AddSchoolModalProps) {
+export default function AddSchoolModal({ isOpen, onClose }: AddSchoolModalProps) {
+  // Don't fetch tenant here to avoid infinite loop - get it from store instead
+  const tenant = null  // TODO: Get from zustand store if needed for display
+  const tenantLoading = false
+
+  // Use the mutation hook
+  const createSchoolMutation = useCreateSchool()
+
   const [schoolName, setSchoolName] = useState('')
-  const [campusCode, setCampusCode] = useState('CJET-IBD')
+  const [campusCode, setCampusCode] = useState('') // Empty for auto-generation
   const [topology, setTopology] = useState<'composite' | 'standalone' | 'satellite'>('composite')
-  const [educationalLevel, setEducationalLevel] = useState('Secondary School (JSS1 - SS3)')
-  const [stateOfLocation, setStateOfLocation] = useState('Oyo State')
+  const [educationalTiers, setEducationalTiers] = useState<EducationalTier[]>([])
+  const [stateId, setStateId] = useState<string>('')
+  const [localGovernmentId, setLocalGovernmentId] = useState<string>('')
   const [physicalAddress, setPhysicalAddress] = useState('')
   const [schoolHeadName, setSchoolHeadName] = useState('')
   const [schoolHeadEmail, setSchoolHeadEmail] = useState('')
@@ -24,40 +51,61 @@ export default function AddSchoolModal({ isOpen, onClose, onSubmit }: AddSchoolM
   const [seatCapacity, setSeatCapacity] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Fetch states and local governments
+  const { data: states, isLoading: statesLoading } = useStates()
+  const { data: localGovernments, isLoading: lgasLoading } = useLocalGovernments(stateId || null)
+
+  // Handle tier checkbox changes
+  const toggleTier = (tier: EducationalTier) => {
+    setEducationalTiers(prev =>
+      prev.includes(tier)
+        ? prev.filter(t => t !== tier)
+        : [...prev, tier]
+    )
+  }
+
   if (!isOpen) return null
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
 
-    const data = {
-      schoolName,
-      campusCode,
-      topology,
-      educationalLevel,
-      stateOfLocation,
-      physicalAddress,
-      schoolHeadName,
-      schoolHeadEmail,
-      schoolHeadPhone,
-      seatCapacity: parseInt(seatCapacity),
+    try {
+      const data = {
+        name: schoolName,
+        campusCode: campusCode || null, // Send null for auto-generation
+        topology: topology.toUpperCase() as any,
+        educationalTiers: topology === 'composite' ? null : educationalTiers, // Backend handles COMPOSITE automatically
+        stateId,
+        localGovernmentId: localGovernmentId || null, // Optional field
+        physicalAddress,
+        schoolHeadName,
+        schoolHeadEmail,
+        schoolHeadPhone,
+        seatCapacity: parseInt(seatCapacity),
+      }
+
+      // Call the actual API via the mutation
+      await createSchoolMutation.mutateAsync(data)
+
+      // Close the modal and reset form on success
+      handleClose()
+    } catch (error) {
+      // Error handling is done in the mutation hook (toast notification)
+      console.error('Failed to create school:', error)
+    } finally {
+      setIsSubmitting(false)
     }
-
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800))
-
-    onSubmit(data)
-    setIsSubmitting(false)
-    handleClose()
   }
 
   const handleClose = () => {
     // Reset form
     setSchoolName('')
-    setCampusCode('CJET-IBD')
+    setCampusCode('')
     setTopology('composite')
-    setEducationalLevel('Secondary School (JSS1 - SS3)')
-    setStateOfLocation('Oyo State')
+    setEducationalTiers([])
+    setStateId('')
+    setLocalGovernmentId('')
     setPhysicalAddress('')
     setSchoolHeadName('')
     setSchoolHeadEmail('')
@@ -83,7 +131,7 @@ export default function AddSchoolModal({ isOpen, onClose, onSubmit }: AddSchoolM
                 <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded uppercase">New Branch</span>
               </div>
               <p className="text-sm text-gray-600 mt-1">
-                Register a new branch under <strong>Crown Jewel Education Trust</strong>. It will automatically inherit trust-wide settings.
+                Register a new branch under <strong>{tenantLoading ? 'Loading...' : (tenant?.name || 'your organization')}</strong>. It will automatically inherit trust-wide settings.
               </p>
             </div>
           </div>
@@ -134,8 +182,8 @@ export default function AddSchoolModal({ isOpen, onClose, onSubmit }: AddSchoolM
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-900 mb-2">
-                    Campus Code <span className="text-red-500">*</span>
-                    <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-bold rounded">Auto-Gen</span>
+                    Campus Code (Optional)
+                    <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded">Auto-Generated</span>
                   </label>
                   <div className="relative">
                     <svg className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -145,37 +193,13 @@ export default function AddSchoolModal({ isOpen, onClose, onSubmit }: AddSchoolM
                       type="text"
                       value={campusCode}
                       onChange={(e) => setCampusCode(e.target.value)}
+                      placeholder="Leave empty for auto-generation (e.g., CROWN-001)"
                       className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-mono"
-                      required
                     />
                   </div>
-                </div>
-
-                <div className="col-span-2">
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">
-                    Educational Level / Category <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <svg className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                    </svg>
-                    <select
-                      value={educationalLevel}
-                      onChange={(e) => setEducationalLevel(e.target.value)}
-                      className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none bg-white"
-                      required
-                    >
-                      <option value="Early Years / Nursery (Crèche - Pre-Primary)">Early Years / Nursery (Crèche - Pre-Primary)</option>
-                      <option value="Primary School (Basic 1 - Basic 6)">Primary School (Basic 1 - Basic 6)</option>
-                      <option value="Secondary School (JSS1 - SS3)">Secondary School (JSS1 - SS3)</option>
-                      <option value="Junior Secondary Only (JSS1 - JSS3)">Junior Secondary Only (JSS1 - JSS3)</option>
-                      <option value="Senior Secondary Only (SS1 - SS3)">Senior Secondary Only (SS1 - SS3)</option>
-                      <option value="Comprehensive (Nursery - SS3)">Comprehensive (Nursery - SS3)</option>
-                    </select>
-                    <svg className="w-5 h-5 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Auto-generated format: TENANT_CODE-XXX (e.g., CROWN-001, CROWN-002)
+                  </p>
                 </div>
               </div>
             </div>
@@ -351,11 +375,90 @@ export default function AddSchoolModal({ isOpen, onClose, onSubmit }: AddSchoolM
               </div>
             </div>
 
-            {/* Section 3: Location & Address */}
+            {/* Section 3: Educational Level / Category */}
             <div>
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
                   3
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Educational Level / Category</h3>
+                  <p className="text-xs text-gray-600">Select the academic tiers this campus will offer based on topology.</p>
+                </div>
+              </div>
+
+              <div className="pl-11">
+                {topology === 'composite' ? (
+                  /* COMPOSITE - Show all tiers automatically */
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-start gap-3 mb-3">
+                      <svg className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <div>
+                        <h4 className="font-semibold text-green-900 mb-1">All Educational Tiers Auto-Assigned</h4>
+                        <p className="text-xs text-green-800">
+                          Composite campuses automatically include all educational tiers below.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mt-3">
+                      {Object.entries(EDUCATIONAL_TIER_LABELS).map(([tier, label]) => (
+                        <div key={tier} className="flex items-center gap-2 bg-white rounded-md px-3 py-2 border border-green-300">
+                          <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className="text-sm text-gray-800">{label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  /* STANDALONE/SATELLITE - Show checkboxes */
+                  <div>
+                    <p className="text-sm text-gray-700 mb-3">
+                      Select one or more educational tiers for this {topology === 'standalone' ? 'standalone' : 'satellite'} campus:
+                    </p>
+                    <div className="space-y-2">
+                      {Object.entries(EDUCATIONAL_TIER_LABELS).map(([tier, label]) => (
+                        <label
+                          key={tier}
+                          className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                            educationalTiers.includes(tier as EducationalTier)
+                              ? 'bg-blue-50 border-blue-500'
+                              : 'bg-white border-gray-200 hover:border-blue-300'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={educationalTiers.includes(tier as EducationalTier)}
+                            onChange={() => toggleTier(tier as EducationalTier)}
+                            className="mt-0.5 w-4 h-4 text-blue-600 focus:ring-blue-600 rounded"
+                          />
+                          <div className="flex-1">
+                            <span className="text-sm font-medium text-gray-900">{label}</span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                    {educationalTiers.length === 0 && (
+                      <p className="mt-2 text-xs text-red-600 flex items-center gap-1">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Please select at least one educational tier
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Section 4: Location & Address */}
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
+                  4
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-gray-900">Location & Address</h3>
@@ -373,21 +476,23 @@ export default function AddSchoolModal({ isOpen, onClose, onSubmit }: AddSchoolM
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
                     </svg>
                     <select
-                      value={stateOfLocation}
-                      onChange={(e) => setStateOfLocation(e.target.value)}
+                      value={stateId}
+                      onChange={(e) => {
+                        setStateId(e.target.value)
+                        setLocalGovernmentId('') // Reset LGA when state changes
+                      }}
                       className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none bg-white"
                       required
+                      disabled={statesLoading}
                     >
-                      <option value="Oyo State">Oyo State</option>
-                      <option value="Lagos State">Lagos State</option>
-                      <option value="FCT Abuja">FCT Abuja</option>
-                      <option value="Kano State">Kano State</option>
-                      <option value="Rivers State">Rivers State</option>
-                      <option value="Kaduna State">Kaduna State</option>
-                      <option value="Ogun State">Ogun State</option>
-                      <option value="Anambra State">Anambra State</option>
-                      <option value="Delta State">Delta State</option>
-                      <option value="Edo State">Edo State</option>
+                      <option value="">
+                        {statesLoading ? 'Loading states...' : 'Select a state'}
+                      </option>
+                      {states?.map((state) => (
+                        <option key={state.id} value={state.id}>
+                          {state.name}
+                        </option>
+                      ))}
                     </select>
                     <svg className="w-5 h-5 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -396,6 +501,40 @@ export default function AddSchoolModal({ isOpen, onClose, onSubmit }: AddSchoolM
                 </div>
 
                 <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                    Local Government Area (Optional)
+                  </label>
+                  <div className="relative">
+                    <svg className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <select
+                      value={localGovernmentId}
+                      onChange={(e) => setLocalGovernmentId(e.target.value)}
+                      className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      disabled={!stateId || lgasLoading}
+                    >
+                      <option value="">
+                        {!stateId
+                          ? 'Select a state first'
+                          : lgasLoading
+                          ? 'Loading LGAs...'
+                          : 'Select Local Government (Optional)'}
+                      </option>
+                      {localGovernments?.map((lga) => (
+                        <option key={lga.id} value={lga.id}>
+                          {lga.name}
+                        </option>
+                      ))}
+                    </select>
+                    <svg className="w-5 h-5 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+
+                <div className="col-span-2">
                   <label className="block text-sm font-semibold text-gray-900 mb-2">
                     Physical Campus Address <span className="text-red-500">*</span>
                   </label>
@@ -417,11 +556,11 @@ export default function AddSchoolModal({ isOpen, onClose, onSubmit }: AddSchoolM
               </div>
             </div>
 
-            {/* Section 4: Initial School Leadership */}
+            {/* Section 5: Initial School Leadership */}
             <div>
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
-                  4
+                  5
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-gray-900">Initial School Leadership</h3>
@@ -489,11 +628,11 @@ export default function AddSchoolModal({ isOpen, onClose, onSubmit }: AddSchoolM
               </div>
             </div>
 
-            {/* Section 5: Capacity Allocation */}
+            {/* Section 6: Capacity Allocation */}
             <div>
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
-                  5
+                  6
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-gray-900">Capacity Allocation</h3>

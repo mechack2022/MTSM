@@ -15,6 +15,27 @@ export function useAllTenants(activeOnly?: boolean) {
   })
 }
 
+export function useTenant() {
+  return useQuery({
+    queryKey: ['tenant', 'me'],
+    queryFn: async () => {
+      const response = await api.get<Tenant>('/tenants/me')
+      return response.data!
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnMount: false, // Don't refetch on component mount
+    refetchOnWindowFocus: false, // Don't refetch when window regains focus
+    retry: (failureCount, error: any) => {
+      // Don't retry on 400 errors (missing tenant_id in JWT)
+      if (error?.response?.status === 400) {
+        return false
+      }
+      // Retry other errors up to 3 times
+      return failureCount < 3
+    },
+  })
+}
+
 export function useTenantById(id: string | null) {
   return useQuery({
     queryKey: queryKeys.tenants.detail(id!),

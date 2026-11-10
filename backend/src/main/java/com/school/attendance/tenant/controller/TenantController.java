@@ -89,4 +89,23 @@ public class TenantController {
         TenantResponse tenant = tenantService.suspendTenant(id);
         return ResponseEntity.ok(tenant);
     }
+
+    @GetMapping("/me")
+    @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SCHOOL_ADMIN', 'TEACHER')")
+    public ResponseEntity<TenantResponse> getMyTenant(@org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.oauth2.jwt.Jwt jwt) {
+        String tenantIdStr = jwt.getClaimAsString("tenant_id");
+        if (tenantIdStr == null || tenantIdStr.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        UUID tenantId;
+        try {
+            tenantId = UUID.fromString(tenantIdStr);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        TenantResponse tenant = tenantService.getTenantById(tenantId);
+        return ResponseEntity.ok(tenant);
+    }
 }

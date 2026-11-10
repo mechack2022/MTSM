@@ -2,6 +2,8 @@ package com.school.attendance.school.service;
 
 import com.school.attendance.common.exception.DuplicateResourceException;
 import com.school.attendance.common.exception.ResourceNotFoundException;
+import com.school.attendance.common.util.PasswordGenerator;
+import com.school.attendance.common.util.PhoneNumberValidator;
 import com.school.attendance.location.entity.LocalGovernment;
 import com.school.attendance.location.entity.State;
 import com.school.attendance.location.repository.LocalGovernmentRepository;
@@ -36,6 +38,7 @@ public class SchoolService {
     private final StateRepository stateRepository;
     private final LocalGovernmentRepository localGovernmentRepository;
     private final CampusCodeGenerator campusCodeGenerator;
+    private final com.school.attendance.keycloak.KeycloakUserService keycloakUserService;
 
     @Transactional
     public SchoolResponse createSchool(UUID tenantId, CreateSchoolRequest request) {
@@ -71,6 +74,15 @@ public class SchoolService {
             }
         }
 
+        // Validate and format phone number (if provided)
+        String formattedPhone = null;
+        if (request.schoolHeadPhone() != null && !request.schoolHeadPhone().isBlank()) {
+            if (!PhoneNumberValidator.isValidNigerianPhoneNumber(request.schoolHeadPhone())) {
+                throw new IllegalArgumentException("Invalid Nigerian phone number. Expected format: 08012345678 or +2348012345678");
+            }
+            formattedPhone = PhoneNumberValidator.formatNigerianPhoneNumber(request.schoolHeadPhone());
+        }
+
         // Determine educational tiers based on topology
         Set<EducationalTier> educationalTiers;
         if (request.topology() == School.Topology.COMPOSITE) {
@@ -94,9 +106,9 @@ public class SchoolService {
                 .state(state)
                 .localGovernment(localGovernment)
                 .physicalAddress(request.physicalAddress())
-                .schoolHeadName(request.schoolHeadName())
+                .schoolHeadName(buildFullName(request.schoolHeadFirstName(), request.schoolHeadLastName()))
                 .schoolHeadEmail(request.schoolHeadEmail())
-                .schoolHeadPhone(request.schoolHeadPhone())
+                .schoolHeadPhone(formattedPhone)
                 .seatCapacity(request.seatCapacity())
                 .currentStudents(0)
                 .currentTeachers(0)
@@ -105,6 +117,51 @@ public class SchoolService {
 
         School savedSchool = schoolRepository.save(school);
         log.info("Created school: {} ({}) for tenant: {}", savedSchool.getName(), savedSchool.getCampusCode(), tenantId);
+
+        // Create a Keycloak user account for the school admin (school head)
+        if (request.schoolHeadEmail() != null && !request.schoolHeadEmail().isBlank()) {
+            try {
+                // Check if email is already in use in Keycloak
+                if (keycloakUserService.getUserByEmail(request.schoolHeadEmail()).isPresent()) {
+                    throw new DuplicateResourceException("A user with this email already exists: " + request.schoolHeadEmail());
+                }
+
+                // Generate a temporary password for the school admin
+                String tempPassword = PasswordGenerator.generatePassword();
+
+                // Use the provided first and last names with fallback defaults
+                String firstName = (request.schoolHeadFirstName() != null && !request.schoolHeadFirstName().isBlank())
+                        ? request.schoolHeadFirstName() : "School";
+                String lastName = (request.schoolHeadLastName() != null && !request.schoolHeadLastName().isBlank())
+                        ? request.schoolHeadLastName() : "Admin";
+
+                // Create the Keycloak user with school_admin role and set tenant_id + school_id attributes
+                String userId = keycloakUserService.createUserWithTenantAndSchool(
+                        request.schoolHeadEmail(),
+                        firstName,
+                        lastName,
+                        tempPassword,
+                        "school_admin",
+                        tenantId,
+                        savedSchool.getId()
+                );
+
+                // Send email verification to the school admin
+                keycloakUserService.sendVerificationEmail(userId);
+
+                log.info("Created school admin user for school: {} - Email: {} (Name: {} {})",
+                        savedSchool.getName(), request.schoolHeadEmail(), firstName, lastName);
+            } catch (DuplicateResourceException e) {
+                // Re-throw validation errors to fail the school creation
+                throw e;
+            } catch (Exception e) {
+                log.error("Failed to create school admin user for school {}: {}", savedSchool.getName(), e.getMessage());
+                // Don't fail the entire school creation if user creation fails for other reasons
+                // The school is still created, but the admin user needs to be created manually
+            }
+        } else {
+            log.warn("No school head email provided for school: {}. School admin user not created.", savedSchool.getName());
+        }
 
         return SchoolResponse.from(savedSchool);
     }
@@ -249,5 +306,25 @@ public class SchoolService {
     @Transactional(readOnly = true)
     public int sumCurrentTeachers(UUID tenantId) {
         return schoolRepository.sumCurrentTeachersByTenantId(tenantId);
+    }
+
+    /**
+     * Helper method to build a full name from first and last names.
+     * @param firstName The first name
+     * @param lastName The last name
+     * @return The full name, or null if both are empty
+     */
+    private String buildFullName(String firstName, String lastName) {
+        boolean hasFirstName = firstName != null && !firstName.isBlank();
+        boolean hasLastName = lastName != null && !lastName.isBlank();
+
+        if (hasFirstName && hasLastName) {
+            return firstName.trim() + " " + lastName.trim();
+        } else if (hasFirstName) {
+            return firstName.trim();
+        } else if (hasLastName) {
+            return lastName.trim();
+        }
+        return null;
     }
 }

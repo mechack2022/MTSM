@@ -201,6 +201,26 @@ public class KeycloakUserService {
         log.info("Set emailVerified={} for user: {}", verified, userId);
     }
 
+    /**
+     * Sends a verification email to the user via Keycloak.
+     * The user must verify their email before they can login.
+     * @param userId The Keycloak user ID
+     */
+    public void sendVerificationEmail(String userId) {
+        try {
+            RealmResource realmResource = keycloak.realm(config.getRealm());
+            UserResource userResource = realmResource.users().get(userId);
+
+            // Send verification email via Keycloak
+            userResource.sendVerifyEmail();
+
+            log.info("Sent verification email to user: {}", userId);
+        } catch (Exception e) {
+            log.error("Failed to send verification email to user {}: {}", userId, e.getMessage());
+            throw new RuntimeException("Failed to send verification email", e);
+        }
+    }
+
     // Expose Keycloak client for advanced operations (e.g., sync service)
     public Keycloak getKeycloak() {
         return keycloak;

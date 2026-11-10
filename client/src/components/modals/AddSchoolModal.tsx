@@ -45,7 +45,8 @@ export default function AddSchoolModal({ isOpen, onClose }: AddSchoolModalProps)
   const [stateId, setStateId] = useState<string>('')
   const [localGovernmentId, setLocalGovernmentId] = useState<string>('')
   const [physicalAddress, setPhysicalAddress] = useState('')
-  const [schoolHeadName, setSchoolHeadName] = useState('')
+  const [schoolHeadFirstName, setSchoolHeadFirstName] = useState('')
+  const [schoolHeadLastName, setSchoolHeadLastName] = useState('')
   const [schoolHeadEmail, setSchoolHeadEmail] = useState('')
   const [schoolHeadPhone, setSchoolHeadPhone] = useState('')
   const [seatCapacity, setSeatCapacity] = useState('')
@@ -64,6 +65,14 @@ export default function AddSchoolModal({ isOpen, onClose }: AddSchoolModalProps)
     )
   }
 
+  // Handle phone input - only numbers, max 10 digits
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '') // Remove non-digits
+    if (value.length <= 10) {
+      setSchoolHeadPhone(value)
+    }
+  }
+
   if (!isOpen) return null
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -79,9 +88,10 @@ export default function AddSchoolModal({ isOpen, onClose }: AddSchoolModalProps)
         stateId,
         localGovernmentId: localGovernmentId || null, // Optional field
         physicalAddress,
-        schoolHeadName,
+        schoolHeadFirstName,
+        schoolHeadLastName,
         schoolHeadEmail,
-        schoolHeadPhone,
+        schoolHeadPhone: schoolHeadPhone ? `+234${schoolHeadPhone.replace(/^0+/, '')}` : '',
         seatCapacity: parseInt(seatCapacity),
       }
 
@@ -107,7 +117,8 @@ export default function AddSchoolModal({ isOpen, onClose }: AddSchoolModalProps)
     setStateId('')
     setLocalGovernmentId('')
     setPhysicalAddress('')
-    setSchoolHeadName('')
+    setSchoolHeadFirstName('')
+    setSchoolHeadLastName('')
     setSchoolHeadEmail('')
     setSchoolHeadPhone('')
     setSeatCapacity('')
@@ -569,9 +580,9 @@ export default function AddSchoolModal({ isOpen, onClose }: AddSchoolModalProps)
               </div>
 
               <div className="grid grid-cols-2 gap-4 pl-11">
-                <div className="col-span-2">
+                <div>
                   <label className="block text-sm font-semibold text-gray-900 mb-2">
-                    School Head Full Name <span className="text-red-500">*</span>
+                    School Head First Name <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <svg className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -579,9 +590,28 @@ export default function AddSchoolModal({ isOpen, onClose }: AddSchoolModalProps)
                     </svg>
                     <input
                       type="text"
-                      value={schoolHeadName}
-                      onChange={(e) => setSchoolHeadName(e.target.value)}
-                      placeholder="e.g. Mrs. Adeola Okonkwo"
+                      value={schoolHeadFirstName}
+                      onChange={(e) => setSchoolHeadFirstName(e.target.value)}
+                      placeholder="e.g. Adeola"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                    School Head Last Name <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <svg className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    <input
+                      type="text"
+                      value={schoolHeadLastName}
+                      onChange={(e) => setSchoolHeadLastName(e.target.value)}
+                      placeholder="e.g. Okonkwo"
                       className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       required
                     />
@@ -615,12 +645,15 @@ export default function AddSchoolModal({ isOpen, onClose }: AddSchoolModalProps)
                     <svg className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                     </svg>
+                    <span className="absolute left-10 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-500 select-none">+234</span>
                     <input
                       type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
                       value={schoolHeadPhone}
-                      onChange={(e) => setSchoolHeadPhone(e.target.value)}
-                      placeholder="+234 803 456 7890"
-                      className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      onChange={handlePhoneChange}
+                      placeholder="8031234567"
+                      className="w-full pl-[4.5rem] pr-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       required
                     />
                   </div>

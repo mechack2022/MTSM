@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
@@ -35,8 +36,11 @@ public record CreateSchoolRequest(
     @Size(max = 500, message = "Physical address must not exceed 500 characters")
     String physicalAddress,
 
-    @Size(max = 100, message = "School head name must not exceed 100 characters")
-    String schoolHeadName,
+    @Size(max = 50, message = "School head first name must not exceed 50 characters")
+    String schoolHeadFirstName,
+
+    @Size(max = 50, message = "School head last name must not exceed 50 characters")
+    String schoolHeadLastName,
 
     @Email(message = "Invalid email format")
     @Size(max = 100, message = "School head email must not exceed 100 characters")

@@ -23,7 +23,7 @@ export interface School {
   educationalLevel: string
   stateOfLocation?: string | null
   physicalAddress?: string | null
-  schoolHeadName?: string | null
+  schoolHeadName?: string | null // Combined full name returned by backend
   schoolHeadEmail?: string | null
   schoolHeadPhone?: string | null
   seatCapacity: number
@@ -42,7 +42,8 @@ export interface CreateSchoolRequest {
   educationalLevel: string
   stateOfLocation?: string | null
   physicalAddress?: string | null
-  schoolHeadName?: string | null
+  schoolHeadFirstName?: string | null
+  schoolHeadLastName?: string | null
   schoolHeadEmail?: string | null
   schoolHeadPhone?: string | null
   seatCapacity: number

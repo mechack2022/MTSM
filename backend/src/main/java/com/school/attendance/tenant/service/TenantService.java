@@ -2,6 +2,7 @@ package com.school.attendance.tenant.service;
 
 import com.school.attendance.common.exception.DuplicateResourceException;
 import com.school.attendance.common.exception.ResourceNotFoundException;
+import com.school.attendance.common.util.PasswordGenerator;
 import com.school.attendance.common.util.PhoneNumberValidator;
 import com.school.attendance.email.entity.EmailVerification;
 import com.school.attendance.email.service.EmailVerificationService;
@@ -38,9 +39,6 @@ public class TenantService {
     private final StateRepository stateRepository;
     private final LocalGovernmentRepository localGovernmentRepository;
 
-    private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%";
-    private static final SecureRandom RANDOM = new SecureRandom();
-
     @Transactional
     public CreateTenantResponse createTenant(CreateTenantRequest request) {
         if (tenantRepository.existsByCode(request.code())) {
@@ -62,6 +60,12 @@ public class TenantService {
         if (request.contactPhone() != null && !request.contactPhone().isBlank() &&
             tenantRepository.existsByContactPhone(request.contactPhone())) {
             throw new DuplicateResourceException("A tenant with this contact phone already exists: " + request.contactPhone());
+        }
+
+        // Check for duplicate subdomain (if provided)
+        if (request.subdomain() != null && !request.subdomain().isBlank() &&
+            tenantRepository.existsBySubdomain(request.subdomain())) {
+            throw new DuplicateResourceException("A tenant with this subdomain already exists: " + request.subdomain());
         }
 
         // Validate phone number format (if provided)
@@ -109,7 +113,7 @@ public class TenantService {
         Tenant savedTenant = tenantRepository.save(tenant);
         log.info("Created tenant: {} ({})", savedTenant.getName(), savedTenant.getCode());
 
-        String tempPassword = generateTemporaryPassword();
+        String tempPassword = PasswordGenerator.generatePassword();
         String keycloakUserId = keycloakUserService.createTenantAdmin(
                 savedTenant.getId().toString(),
                 request.contactName(),
@@ -299,13 +303,5 @@ public class TenantService {
                 EmailVerification.VerificationType.TENANT_ADMIN
         );
         return TenantResponse.from(tenant, emailVerified);
-    }
-
-    private String generateTemporaryPassword() {
-        StringBuilder password = new StringBuilder(16);
-        for (int i = 0; i < 16; i++) {
-            password.append(CHARACTERS.charAt(RANDOM.nextInt(CHARACTERS.length())));
-        }
-        return password.toString();
     }
 }

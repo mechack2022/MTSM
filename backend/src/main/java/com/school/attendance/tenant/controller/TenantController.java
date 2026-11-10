@@ -2,6 +2,7 @@ package com.school.attendance.tenant.controller;
 
 import com.school.attendance.tenant.dto.CreateTenantRequest;
 import com.school.attendance.tenant.dto.CreateTenantResponse;
+import com.school.attendance.tenant.dto.TenantDashboardResponse;
 import com.school.attendance.tenant.dto.TenantResponse;
 import com.school.attendance.tenant.dto.UpdateTenantRequest;
 import com.school.attendance.tenant.service.TenantService;
@@ -107,5 +108,27 @@ public class TenantController {
 
         TenantResponse tenant = tenantService.getTenantById(tenantId);
         return ResponseEntity.ok(tenant);
+    }
+
+    @GetMapping("/dashboard")
+    @PreAuthorize("hasRole('TENANT_ADMIN')")
+    public ResponseEntity<TenantDashboardResponse> getTenantDashboard(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.oauth2.jwt.Jwt jwt) {
+        // Extract tenant ID from JWT
+        String tenantIdStr = jwt.getClaimAsString("tenant_id");
+        if (tenantIdStr == null || tenantIdStr.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        UUID tenantId;
+        try {
+            tenantId = UUID.fromString(tenantIdStr);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        // Get comprehensive dashboard data
+        TenantDashboardResponse dashboard = tenantService.getTenantDashboard(tenantId);
+        return ResponseEntity.ok(dashboard);
     }
 }

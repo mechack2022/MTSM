@@ -86,3 +86,71 @@ export interface UpdateTenantRequest {
   subscriptionEndDate?: string
   metadata?: string
 }
+
+// Dashboard Types
+export interface TenantDashboardStatistics {
+  totalSchools: number
+  activeSchools: number
+  suspendedSchools: number
+  totalSeatCapacity: number
+  totalCurrentStudents: number
+  availableSeats: number
+  occupancyRate: number
+  totalCurrentTeachers: number
+  remainingQuota: number
+  quotaUsageRate: number
+}
+
+export interface TenantDashboard {
+  // Tenant Basic Information
+  tenantId: string
+  tenantCode: string
+  tenantName: string
+  cacNumber?: string
+  subdomain?: string
+  address?: string
+  contactName: string
+  roleTitle?: string
+  contactEmail: string
+  contactPhone?: string
+  stateName?: string
+  localGovernmentName?: string
+
+  // Status & Subscription
+  status: TenantStatus
+  subscriptionTier: SubscriptionTier
+  studentQuota: number
+  billingCycle?: BillingCycle
+  subscriptionStartDate?: string
+  subscriptionEndDate?: string
+  emailVerified: boolean
+
+  // Aggregated Statistics
+  statistics: TenantDashboardStatistics
+
+  // List of Schools (simplified School type from backend)
+  schools: Array<{
+    id: string
+    name: string
+    campusCode: string
+    topology: string
+    educationalTiers: string[]
+    stateName?: string
+    localGovernmentName?: string
+    physicalAddress?: string
+    schoolHeadName?: string
+    schoolHeadEmail?: string
+    schoolHeadPhone?: string
+    seatCapacity: number
+    currentStudents: number
+    currentTeachers: number
+    status: string
+    createdAt: string
+    updatedAt: string
+  }>
+
+  // Metadata
+  metadata?: string
+  createdAt: string
+  updatedAt: string
+}

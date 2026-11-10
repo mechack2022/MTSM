@@ -11,8 +11,12 @@ import com.school.attendance.location.entity.LocalGovernment;
 import com.school.attendance.location.entity.State;
 import com.school.attendance.location.repository.LocalGovernmentRepository;
 import com.school.attendance.location.repository.StateRepository;
+import com.school.attendance.school.dto.SchoolResponse;
+import com.school.attendance.school.entity.School;
+import com.school.attendance.school.repository.SchoolRepository;
 import com.school.attendance.tenant.dto.CreateTenantRequest;
 import com.school.attendance.tenant.dto.CreateTenantResponse;
+import com.school.attendance.tenant.dto.TenantDashboardResponse;
 import com.school.attendance.tenant.dto.TenantResponse;
 import com.school.attendance.tenant.dto.UpdateTenantRequest;
 import com.school.attendance.tenant.entity.Tenant;
@@ -34,6 +38,7 @@ import java.util.UUID;
 public class TenantService {
 
     private final TenantRepository tenantRepository;
+    private final SchoolRepository schoolRepository;
     private final KeycloakUserService keycloakUserService;
     private final EmailVerificationService emailVerificationService;
     private final StateRepository stateRepository;
@@ -295,6 +300,78 @@ public class TenantService {
         log.info("Suspended tenant: {} ({})", updatedTenant.getName(), updatedTenant.getCode());
 
         return toTenantResponse(updatedTenant);
+    }
+
+    @Transactional(readOnly = true)
+    public TenantDashboardResponse getTenantDashboard(UUID tenantId) {
+        // Get tenant information
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tenant not found with id: " + tenantId));
+
+        // Get all schools for this tenant
+        List<School> schools = schoolRepository.findAllByTenantId(tenantId);
+
+        // Convert schools to response DTOs
+        List<SchoolResponse> schoolResponses = schools.stream()
+                .map(SchoolResponse::from)
+                .toList();
+
+        // Calculate statistics
+        long totalSchools = schools.size();
+        long activeSchools = schools.stream()
+                .filter(school -> school.getStatus() == School.SchoolStatus.ACTIVE)
+                .count();
+        long suspendedSchools = schools.stream()
+                .filter(school -> school.getStatus() == School.SchoolStatus.SUSPENDED)
+                .count();
+
+        int totalSeatCapacity = schools.stream()
+                .mapToInt(School::getSeatCapacity)
+                .sum();
+
+        int totalCurrentStudents = schools.stream()
+                .mapToInt(School::getCurrentStudents)
+                .sum();
+
+        int totalCurrentTeachers = schools.stream()
+                .mapToInt(School::getCurrentTeachers)
+                .sum();
+
+        int availableSeats = totalSeatCapacity - totalCurrentStudents;
+
+        double occupancyRate = totalSeatCapacity > 0
+                ? ((double) totalCurrentStudents / totalSeatCapacity) * 100
+                : 0.0;
+
+        int remainingQuota = tenant.getStudentQuota() - totalCurrentStudents;
+
+        double quotaUsageRate = tenant.getStudentQuota() > 0
+                ? ((double) totalCurrentStudents / tenant.getStudentQuota()) * 100
+                : 0.0;
+
+        TenantDashboardResponse.Statistics statistics = TenantDashboardResponse.Statistics.builder()
+                .totalSchools(totalSchools)
+                .activeSchools(activeSchools)
+                .suspendedSchools(suspendedSchools)
+                .totalSeatCapacity(totalSeatCapacity)
+                .totalCurrentStudents(totalCurrentStudents)
+                .availableSeats(availableSeats)
+                .occupancyRate(Math.round(occupancyRate * 100.0) / 100.0) // Round to 2 decimal places
+                .totalCurrentTeachers(totalCurrentTeachers)
+                .remainingQuota(remainingQuota)
+                .quotaUsageRate(Math.round(quotaUsageRate * 100.0) / 100.0) // Round to 2 decimal places
+                .build();
+
+        // Check email verification status
+        boolean emailVerified = emailVerificationService.isEmailVerified(
+                tenant.getContactEmail(),
+                EmailVerification.VerificationType.TENANT_ADMIN
+        );
+
+        log.info("Generated dashboard for tenant: {} ({}) - {} schools, {} students, {} teachers",
+                tenant.getName(), tenant.getCode(), totalSchools, totalCurrentStudents, totalCurrentTeachers);
+
+        return TenantDashboardResponse.from(tenant, emailVerified, schoolResponses, statistics);
     }
 
     private TenantResponse toTenantResponse(Tenant tenant) {

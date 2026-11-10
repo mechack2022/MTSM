@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/store'
-import { useLogout } from '@/hooks'
+import { useLogout, useTenantDashboard } from '@/hooks'
 import AddSchoolModal from '@/components/modals/AddSchoolModal'
 import toast from 'react-hot-toast'
 
@@ -18,21 +18,22 @@ export default function TenantAdminDashboardPage() {
   const navigate = useNavigate()
   const { user, tenant } = useAuth()
   const logout = useLogout()
+  const { data: dashboard, isLoading, isError } = useTenantDashboard()
   const [isAddSchoolModalOpen, setIsAddSchoolModalOpen] = useState(false)
 
   const handleLogout = () => {
     logout.mutate()
   }
 
-  // Calculate student quota usage
-  const studentQuota = tenant?.studentQuota || 1500
-  const currentStudents = 1142 // TODO: Get from schools API when available
-  const studentUsagePercent = ((currentStudents / studentQuota) * 100).toFixed(1)
-  const availableSeats = studentQuota - currentStudents
+  // Calculate student quota usage from dashboard data
+  const studentQuota = dashboard?.studentQuota || tenant?.studentQuota || 1500
+  const currentStudents = dashboard?.statistics.totalCurrentStudents || 0
+  const studentUsagePercent = dashboard?.statistics.quotaUsageRate.toFixed(1) || '0.0'
+  const availableSeats = dashboard?.statistics.availableSeats || (studentQuota - currentStudents)
 
   // Get subscription tier display
-  const subscriptionTier = tenant?.subscriptionTier || 'Standard'
-  const activeCampuses = 3 // TODO: Get from schools API when available
+  const subscriptionTier = dashboard?.subscriptionTier || tenant?.subscriptionTier || 'Standard'
+  const activeCampuses = dashboard?.statistics.activeSchools || 0
 
   const handleAddSchoolSubmit = (data: any) => {
     console.log('New school/campus data:', data)
@@ -248,9 +249,15 @@ export default function TenantAdminDashboardPage() {
                     </span>
                   </div>
                   <p className="text-sm text-gray-600 mt-1.5 flex items-center gap-2 flex-wrap">
-                    <span>{tenant?.name || 'Loading...'} (Code: {tenant?.code || 'N/A'})</span>
+                    <span className="font-semibold text-gray-900">{dashboard?.tenantName || tenant?.name || 'Loading...'}</span>
                     <span className="w-1 h-1 rounded-full bg-gray-400"></span>
-                    <span>{tenant?.stateName || 'Multiple'} {tenant?.localGovernmentName ? `• ${tenant.localGovernmentName}` : ''}</span>
+                    <span>Code: {dashboard?.tenantCode || tenant?.code || 'N/A'}</span>
+                    {(dashboard?.address || tenant?.address) && (
+                      <>
+                        <span className="w-1 h-1 rounded-full bg-gray-400"></span>
+                        <span>{dashboard?.address || tenant?.address}</span>
+                      </>
+                    )}
                     <span className="w-1 h-1 rounded-full bg-gray-400"></span>
                     <span className="text-green-600 font-semibold">2025/2026 Academic Session</span>
                   </p>
@@ -339,7 +346,7 @@ export default function TenantAdminDashboardPage() {
                       </div>
                     </div>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-bold text-gray-900 tracking-tight">84</span>
+                      <span className="text-3xl font-bold text-gray-900 tracking-tight">{dashboard?.statistics.totalCurrentTeachers || 0}</span>
                       <span className="text-[11px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full uppercase">All Verified</span>
                     </div>
                   </div>
@@ -395,67 +402,49 @@ export default function TenantAdminDashboardPage() {
                   </div>
 
                   {/* Campus Cards */}
-                  {/* TODO: Map over real schools/campuses from API */}
-                  {[
-                    {
-                      name: 'Crown Jewel High School - Lekki Campus',
-                      type: 'Senior & Junior Secondary (JSS1 – SS3) • WAEC / Cambridge IGCSE',
-                      head: 'Mrs. Folake Balogun',
-                      students: 520,
-                      teachers: 38,
-                      icon: 'school',
-                      color: 'blue',
-                    },
-                    {
-                      name: 'Crown Jewel Preparatory - Ikeja',
-                      type: 'Nursery & Primary (Crèche – Basic 6) • National & Early Years Curriculum',
-                      head: 'Mr. Kenneth Okafor',
-                      students: 382,
-                      teachers: 28,
-                      icon: 'child_care',
-                      color: 'green',
-                    },
-                    {
-                      name: 'Crown Jewel Academy - Abuja FCT',
-                      type: 'Comprehensive Primary & Secondary • Day & Boarding Facilities',
-                      head: 'Dr. Amina Bello',
-                      students: 240,
-                      teachers: 18,
-                      icon: 'apartment',
-                      color: 'amber',
-                    },
-                  ].map((campus, idx) => (
-                    <div key={idx} className="p-6 rounded-xl bg-white shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row gap-6 items-start md:items-center justify-between border border-gray-100">
+                  {/* Map over real schools/campuses from API */}
+                  {dashboard?.schools && dashboard.schools.length > 0 ? (
+                    dashboard.schools.map((school, idx) => (
+                    <div key={school.id} className="p-6 rounded-xl bg-white shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row gap-6 items-start md:items-center justify-between border border-gray-100">
                       <div className="flex gap-4 items-start flex-1 min-w-0">
-                        <div className={`w-14 h-14 rounded-xl bg-${campus.color}-100 text-${campus.color}-600 flex items-center justify-center shrink-0`}>
+                        <div className={`w-14 h-14 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0`}>
                           <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                           </svg>
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2.5 flex-wrap">
-                            <h3 className="text-lg font-semibold text-gray-900 tracking-tight truncate">{campus.name}</h3>
-                            <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[11px] font-bold uppercase">Fully Synced</span>
+                            <h3 className="text-lg font-semibold text-gray-900 tracking-tight truncate">{school.name}</h3>
+                            <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold uppercase ${
+                              school.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                            }`}>
+                              {school.status === 'ACTIVE' ? 'Active' : school.status}
+                            </span>
                           </div>
-                          <p className="text-xs text-gray-600 mt-1">{campus.type}</p>
+                          <p className="text-xs text-gray-600 mt-1">
+                            {school.topology} • {school.educationalTiers.join(', ')}
+                            {school.physicalAddress && ` • ${school.physicalAddress}`}
+                          </p>
                           <div className="flex items-center gap-6 mt-3.5 pt-3 bg-gray-50 px-3 py-2 rounded-lg text-gray-600 text-xs">
-                            <div className="flex items-center gap-1.5">
-                              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                              </svg>
-                              <span>Head: <strong className="text-gray-900 font-semibold">{campus.head}</strong></span>
-                            </div>
+                            {school.schoolHeadName && (
+                              <div className="flex items-center gap-1.5">
+                                <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                                <span>Head: <strong className="text-gray-900 font-semibold">{school.schoolHeadName}</strong></span>
+                              </div>
+                            )}
                             <div className="hidden sm:flex items-center gap-1.5">
                               <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                               </svg>
-                              <span><strong>{campus.students}</strong> Students</span>
+                              <span><strong>{school.currentStudents}</strong> Students</span>
                             </div>
                             <div className="hidden sm:flex items-center gap-1.5">
                               <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
                               </svg>
-                              <span><strong>{campus.teachers}</strong> Teachers</span>
+                              <span><strong>{school.currentTeachers}</strong> Teachers</span>
                             </div>
                           </div>
                         </div>
@@ -472,7 +461,12 @@ export default function TenantAdminDashboardPage() {
                         </button>
                       </div>
                     </div>
-                  ))}
+                  ))
+                  ) : (
+                    <div className="p-8 rounded-xl bg-gray-50 text-center">
+                      <p className="text-gray-600">No schools found. Add your first school to get started.</p>
+                    </div>
+                  )}
 
                   {/* Add Campus CTA */}
                   <button

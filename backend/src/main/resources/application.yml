@@ -1,54 +1,102 @@
+# ============================================================================
+# SCHOOL ATTENDANCE SYSTEM - APPLICATION CONFIGURATION
+# ============================================================================
+# Fresh start with Keycloak authentication and Flyway migrations
+
 spring:
   application:
-    name: school-attendance-api
+    name: school-attendance-backend
 
   profiles:
     active: dev
 
-  security:
-    jwt:
-      secret-key: ${JWT_SECRET:dGVzdC1zZWNyZXQta2V5LWZvci1pbnRlZ3JhdGlvbi10ZXN0cy1vbmx5LTEyMzQ1Njc4OTA=}
-      expiration-time: 86400000 # 24 hours in milliseconds
-
+  # ===========================================================================
+  # DATABASE CONFIGURATION
+  # ===========================================================================
   datasource:
-    url: ${DB_URL}
-    username: attendance_user
-    password: ${DB_PASSWORD}
+    url: jdbc:postgresql://localhost:5432/${POSTGRES_DB:mtsms}
+    username: ${POSTGRES_USER:mtsms}
+    password: ${POSTGRES_PASSWORD}
     driver-class-name: org.postgresql.Driver
-    # HikariCP tuning for better performance under load
+
+    # HikariCP connection pool settings
     hikari:
       maximum-pool-size: 10
       minimum-idle: 5
-      connection-timeout: 20000 # 20 seconds
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
 
+  # ===========================================================================
+  # JPA/HIBERNATE CONFIGURATION
+  # ===========================================================================
   jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
-      ddl-auto: validate  # NEVER auto-DDL; Liquibase handles schema exclusively
-    show-sql: false
-    open-in-view: false   # CRITICAL: Prevents lazy-loading exceptions when serializing JSON in REST controllers
+      ddl-auto: update  # Persist data across restarts - update schema automatically
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+        use_sql_comments: true
+        default_schema: public
+        jdbc:
+          batch_size: 20
+          fetch_size: 50
+        order_inserts: true
+        order_updates: true
+    show-sql: false  # Set to true for debugging SQL queries
+    open-in-view: false  # Prevents lazy-loading exceptions
 
-  liquibase:
-    enabled: true
-    change-log: classpath:db/changelog/db.changelog-master.yaml
+  # ===========================================================================
+  # FLYWAY MIGRATIONS
+  # ===========================================================================
+  flyway:
+    enabled: false
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: true
+    out-of-order: false
+    clean-disabled: true  # Safety: prevent accidental data loss
 
-  # Email Configuration
+  # ===========================================================================
+  # SECURITY - KEYCLOAK OAuth2 RESOURCE SERVER
+  # ===========================================================================
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_AUTH_SERVER_URL:http://localhost:8080}/realms/${KEYCLOAK_REALM:MTSMS}
+          jwk-set-uri: ${KEYCLOAK_AUTH_SERVER_URL:http://localhost:8080}/realms/${KEYCLOAK_REALM:MTSMS}/protocol/openid-connect/certs
+
+      client:
+        registration:
+          keycloak:
+            client-id: ${KEYCLOAK_CLIENT_ID:mtsms-backend}
+            client-secret: ${KEYCLOAK_CLIENT_SECRET}
+            authorization-grant-type: client_credentials
+            scope: openid, profile, email
+
+        provider:
+          keycloak:
+            issuer-uri: ${KEYCLOAK_AUTH_SERVER_URL:http://localhost:8080}/realms/${KEYCLOAK_REALM:MTSMS}
+            user-name-attribute: preferred_username
+
+  # ===========================================================================
+  # EMAIL CONFIGURATION (MailHog for development)
+  # ===========================================================================
   mail:
     host: ${MAIL_HOST:localhost}
     port: ${MAIL_PORT:1025}
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_PASSWORD:}
+    username:
+    password:
     properties:
       mail:
         smtp:
           auth: false
           starttls:
             enable: false
-            required: false
-        debug: true
+    from: ${MAIL_FROM:noreply@mtsms.local}
     default-encoding: UTF-8
 
   servlet:
@@ -56,34 +104,130 @@ spring:
       max-file-size: 10MB
       max-request-size: 10MB
 
-server:
-  port: ${SERVER_PORT:8080}
-  shutdown: graceful
+# =============================================================================
+# KEYCLOAK ADMIN CLIENT (for user management API)
+# =============================================================================
+keycloak:
+  realm: ${KEYCLOAK_REALM:MTSMS}
+  auth-server-url: ${KEYCLOAK_AUTH_SERVER_URL:http://localhost:8080}
+  admin:
+    username: ${KEYCLOAK_ADMIN_USER:admin}
+    password: ${KEYCLOAK_ADMIN_PASSWORD}
+    realm: master  # Admin uses master realm
 
+# =============================================================================
+# OFFLINE SYNC CONFIGURATION
+# =============================================================================
+offline:
+  max-offline-days: 21
+  refresh-token-lifetime-days: 30  # 21 + 9 grace period
+  device-trust-days: 60
+  max-devices-per-user: 3
+  sync:
+    batch-size: 100
+    max-queue-age-days: 30
+    conflict-resolution-timeout-hours: 72
+
+# =============================================================================
+# SERVER CONFIGURATION
+# =============================================================================
+server:
+  port: ${SERVER_PORT:8090}  # Different from Keycloak (8080)
+  shutdown: graceful
+  error:
+    include-message: always
+    include-binding-errors: always
+    include-stacktrace: on_param  # Only show stacktrace with ?trace=true
+    include-exception: false
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain
+
+# =============================================================================
+# ACTUATOR - HEALTH & METRICS
+# =============================================================================
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,flyway
+      base-path: /actuator
   endpoint:
     health:
       show-details: when-authorized
       probes:
         enabled: true
+  health:
+    db:
+      enabled: true
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
 
+# =============================================================================
+# LOGGING
+# =============================================================================
 logging:
   level:
-    com.school.attendance: INFO
+    root: INFO
+    com.school.attendance: DEBUG
+    org.springframework.security: DEBUG
     org.springframework.web: INFO
-    org.springframework.security: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.flywaydb: INFO
+  pattern:
+    console: '%d{yyyy-MM-dd HH:mm:ss} - %msg%n'
+    file: '%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n'
 
-app:
-  cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
-  seed:
+# =============================================================================
+# SPRINGDOC - OPENAPI/SWAGGER
+# =============================================================================
+springdoc:
+  api-docs:
+    path: /api-docs
     enabled: true
-    admin-password: ${SEED_ADMIN_PASSWORD}
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operations-sorter: method
+    tags-sorter: alpha
+    doc-expansion: none
+    display-request-duration: true
+    filter: true
+
+# =============================================================================
+# APPLICATION-SPECIFIC CONFIGURATION
+# =============================================================================
+app:
+  name: School Attendance System
+  version: '@project.version@'
+  timezone: Africa/Lagos
+
+  cors:
+    allowed-origins:
+      - http://localhost:3000
+      - http://localhost:5173
+      - http://localhost:3005
+    allowed-methods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+      - OPTIONS
+    allowed-headers: '*'
+    allow-credentials: true
+    max-age: 3600
+
   mail:
-    from: ${MAIL_FROM:noreply@aceedumanage.com}
-    app-name: ACE EDUManage
-    app-url: ${APP_URL:http://localhost:3000}
+    from: noreply@mtsms.local
+    app-name: MTSMS - School Management System
+    app-url: http://localhost:3005
+
+  # Row-Level Security session variables
+  rls:
+    tenant-id-variable: app.current_tenant_id
+    user-id-variable: app.current_user_id
+    user-role-variable: app.current_user_role

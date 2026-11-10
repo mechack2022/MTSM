@@ -1,50 +1,113 @@
 package com.school.attendance.school.entity;
 
-import com.school.attendance.common.entity.BaseAuditableEntity;
+import com.school.attendance.location.entity.LocalGovernment;
+import com.school.attendance.location.entity.State;
+import com.school.attendance.school.enums.EducationalTier;
 import jakarta.persistence.*;
-import lombok.*;
-import lombok.experimental.SuperBuilder;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
-@Table(name = "school")
-@Getter
-@Setter
+@Table(name = "schools")
+@Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@SuperBuilder
-@EqualsAndHashCode(callSuper = true)
-public class School extends BaseAuditableEntity {
+public class School {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name = "tenant_id", nullable = false)
+    @Column(nullable = false)
     private UUID tenantId;
 
-    @Column(nullable = false, length = 255)
+    @Column(nullable = false, length = 200)
     private String name;
 
-    @Column(name = "code", unique = true, nullable = false, length = 50)
-    private String code;
+    @Column(unique = true, nullable = false, length = 50)
+    private String campusCode;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private Topology topology;
+
+    // Educational tiers offered by this school (driven by topology)
+    // COMPOSITE → All tiers automatically
+    // STANDALONE/SATELLITE → User selects one or more tiers
+    @ElementCollection(targetClass = EducationalTier.class, fetch = FetchType.EAGER)
+    @CollectionTable(name = "school_educational_tiers", joinColumns = @JoinColumn(name = "school_id"))
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tier", nullable = false)
+    @Builder.Default
+    private Set<EducationalTier> educationalTiers = new HashSet<>();
+
+    // Location references
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "state_id")
+    private State state;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "local_government_id")
+    private LocalGovernment localGovernment;
 
     @Column(length = 500)
-    private String address;
+    private String physicalAddress;
 
-    @Column(name = "academic_year_id")
-    private UUID academicYearId;
+    @Column(length = 100)
+    private String schoolHeadName;
 
-    @Column(name = "current_term_id")
-    private UUID currentTermId;
+    @Column(length = 100)
+    private String schoolHeadEmail;
 
-    @Column(length = 50)
-    private String phone;
+    @Column(length = 20)
+    private String schoolHeadPhone;
 
-    @Column(length = 255)
-    private String email;
+    @Column(nullable = false)
+    private Integer seatCapacity;
 
-    @Column(name = "logo_url", length = 500)
-    private String logoUrl;
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer currentStudents = 0;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer currentTeachers = 0;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private SchoolStatus status = SchoolStatus.ACTIVE;
+
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
+    private Instant createdAt;
+
+    @UpdateTimestamp
+    @Column(nullable = false)
+    private Instant updatedAt;
+
+    @Column
+    private Instant deletedAt;
+
+    public enum Topology {
+        COMPOSITE,
+        STANDALONE,
+        SATELLITE
+    }
+
+    public enum SchoolStatus {
+        ACTIVE,
+        INACTIVE,
+        SUSPENDED
+    }
 }

@@ -1,85 +1,192 @@
-version: '3.8'
+# ============================================================================
+# MTSMS - Multi-Tenant School Management System
+# ============================================================================
+#
+# IMPORTANT: Create a .env file before running docker-compose
+# Copy .env.example to .env and update with your credentials:
+#   cp .env.example .env
+#
+# Then start all services:
+#   docker-compose up -d
+# ============================================================================
 
 services:
-  db:
-    image: postgres:16
-    container_name: attendance-db
+  # ==================================================================
+  # KEYCLOAK DATABASE
+  # ==================================================================
+  keycloak-db:
+    image: postgres:16-alpine
+    container_name: mtsms-keycloak-db
     environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${KEYCLOAK_DB_NAME}
+      POSTGRES_USER: ${KEYCLOAK_DB_USER}
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - keycloak-db-data:/var/lib/postgresql/data
     ports:
-      - "5434:5432"
+      - "5433:5432"  # Different port to avoid conflict with app DB
+    networks:
+      - mtsms-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-attendance_user} -d ${DB_NAME:-attendance_db}"]
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  mailpit:
-    image: axllent/mailpit:latest
-    container_name: attendance-mailpit
-    ports:
-      - "8025:8025"  # Web UI
-      - "1025:1025"  # SMTP Server
+  # ==================================================================
+  # KEYCLOAK SERVER
+  # ==================================================================
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0.3
+    container_name: mtsms-keycloak
     environment:
-      MP_SMTP_AUTH_ACCEPT_ANY: 1
-      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+      # Database configuration
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/${KEYCLOAK_DB_NAME}
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+
+      # Keycloak admin credentials
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USER}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+
+      # Hostname configuration
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_STRICT: false
+      KC_HOSTNAME_STRICT_HTTPS: false
+      KC_HTTP_ENABLED: true
+
+      # Health and metrics
+      KC_HEALTH_ENABLED: true
+      KC_METRICS_ENABLED: true
+
+      # Logging
+      KC_LOG_LEVEL: INFO
+
+    command:
+      - start-dev
+      - --import-realm
+
+    volumes:
+      # Import initial realm configuration (we'll create this)
+      - ./backend/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+
+    ports:
+      - "8080:8080"  # Keycloak web UI and API
+      - "8443:8443"  # HTTPS (if needed later)
+
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+
+    networks:
+      - mtsms-network
+
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8025/api/v1/info"]
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ==================================================================
+  # APPLICATION DATABASE
+  # ==================================================================
+  app-db:
+    image: postgres:16-alpine
+    container_name: mtsms-app-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+      # Enable logging for debugging
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=en_US.UTF-8"
+
+    volumes:
+      - app-db-data:/var/lib/postgresql/data
+      # Custom PostgreSQL config (for RLS, performance tuning)
+      - ./backend/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      # Initialization scripts (we'll create these)
+      - ./backend/postgres/init-scripts:/docker-entrypoint-initdb.d:ro
+
+    ports:
+      - "5432:5432"
+
+    networks:
+      - mtsms-network
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mtsms"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    # Custom postgres command to use our config
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+
+  # ==================================================================
+  # MAILHOG (Email Testing - Development Only)
+  # ==================================================================
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mtsms-mailhog
+    platform: linux/amd64  # Explicitly set platform for compatibility
+    ports:
+      - "1025:1025"  # SMTP server
+      - "8025:8025"  # Web UI
+    networks:
+      - mtsms-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8025"]
       interval: 10s
       timeout: 5s
       retries: 3
 
-  backend:
-    build: ./backend
-    container_name: attendance-backend
-    depends_on:
-      db:
-        condition: service_healthy
-      mailpit:
-        condition: service_healthy
+  # ==================================================================
+  # PGADMIN (Database Management - Optional)
+  # ==================================================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: attendance-pgadmin
     environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
-      DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-attendance_db}
-      DB_USER: ${DB_USER:-attendance_user}
-      DB_PASSWORD: ${DB_PASSWORD:-changeme}
-      SERVER_PORT: 8080
-      # Email Configuration
-      MAIL_HOST: mailpit
-      MAIL_PORT: 1025
-      MAIL_USERNAME: ""
-      MAIL_PASSWORD: ""
-      MAIL_FROM: noreply@aceedumanage.com
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+      # Pre-configured server connections (we'll create this)
+      - ./backend/pgadmin/servers.json:/pgadmin4/servers.json:ro
+
     ports:
-      - "8080:8080"
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - "5050:80"  # PgAdmin web UI
 
-#  client:
-#    build: ./client
-#    container_name: attendance-client
-#    depends_on:
-#      - backend
-#    environment:
-#      VITE_API_URL: http://localhost:8080
-#    ports:
-#      - "3000:3000"
+    networks:
+      - mtsms-network
 
+    depends_on:
+      - app-db
+      - keycloak-db
+
+# ==================================================================
+# VOLUMES
+# ==================================================================
 volumes:
-  db_data:
+  keycloak-db-data:
+    driver: local
+  app-db-data:
+    driver: local
+  pgadmin-data:
+    driver: local
 
-# Future seam: AI service and message queue will be added here
-# ai-service:
-#   build: ./ai-service
-#   ports:
-#     - "5000:5000"
-# queue:
-#   image: redis:alpine
-#   ports:
-#     - "6379:6379"
+# ==================================================================
+# NETWORKS
+# ==================================================================
+networks:
+  mtsms-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

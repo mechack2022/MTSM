@@ -22,29 +22,90 @@ export interface ApiError {
 // ENTITIES
 // ============================================================================
 
-export interface Tenant {
+export interface State {
   id: string
   name: string
   code: string
-  contactEmail: string | null
-  contactPhone: string | null
-  isActive: boolean
+}
+
+export interface LocalGovernment {
+  id: string
+  stateId: string
+  name: string
+}
+
+export interface Tenant {
+  id: string
+  code: string
+  name: string
+  cacNumber?: string | null
+  subdomain?: string | null
+  stateId?: string | null
+  stateName?: string | null
+  localGovernmentId?: string | null
+  localGovernmentName?: string | null
+  address?: string | null
+  contactName?: string | null
+  roleTitle?: string | null
+  contactEmail: string
+  contactPhone?: string | null
+  status: 'ACTIVE' | 'SUSPENDED' | 'INACTIVE'
+  emailVerified?: boolean
+  subscriptionTier?: 'BASIC' | 'STANDARD' | 'ENTERPRISE' | null
+  studentQuota?: number | null
+  billingCycle?: 'ANNUAL' | 'TERMLY' | 'BIANNUAL' | null
+  subscriptionStartDate?: string | null
+  subscriptionEndDate?: string | null
+  metadata?: string | null
   createdAt: string
-  createdBy: string | null
   updatedAt: string
-  updatedBy: string | null
 }
 
 export interface CreateTenantRequest {
+  code: string
   name: string
-  contactEmail?: string | null
+  cacNumber?: string | null
+  subdomain?: string | null
+  stateId?: string | null
+  localGovernmentId?: string | null
+  address?: string | null
+  contactName?: string | null
+  roleTitle?: string | null
+  contactEmail: string
   contactPhone?: string | null
+  subscriptionTier?: 'BASIC' | 'STANDARD' | 'ENTERPRISE' | null
+  studentQuota?: number | null
+  billingCycle?: 'ANNUAL' | 'TERMLY' | 'BIANNUAL' | null
+  subscriptionStartDate?: string | null
+  subscriptionEndDate?: string | null
+  metadata?: string | null
 }
 
 export interface UpdateTenantRequest {
-  name: string
-  contactEmail?: string | null
+  name?: string
+  stateId?: string | null
+  localGovernmentId?: string | null
+  address?: string | null
+  contactName?: string | null
+  roleTitle?: string | null
+  contactEmail?: string
   contactPhone?: string | null
+  status?: 'ACTIVE' | 'SUSPENDED' | 'INACTIVE'
+  subscriptionTier?: 'BASIC' | 'STANDARD' | 'ENTERPRISE' | null
+  studentQuota?: number | null
+  billingCycle?: 'ANNUAL' | 'TERMLY' | 'BIANNUAL' | null
+  subscriptionStartDate?: string | null
+  subscriptionEndDate?: string | null
+  metadata?: string | null
+}
+
+export interface CreateTenantResponse {
+  tenant: Tenant
+  adminCredentials: {
+    adminName: string
+    adminEmail: string
+    portalUrl: string
+  }
 }
 
 export interface School {
@@ -233,6 +294,41 @@ export interface LoginResponse {
   userId: string
   username: string
   role: string
+}
+
+export interface SignupRequest {
+  organizationName: string
+  organizationCode: string
+  fullName: string
+  email: string
+  username: string
+  password: string
+  contactEmail?: string
+  contactPhone?: string
+}
+
+export interface SignupResponse {
+  userId: string
+  tenantId: string
+  email: string
+  message: string
+}
+
+export interface VerifyEmailResponse {
+  success: boolean
+  message: string
+  metadata: {
+    tenantId?: string
+    keycloakUserId?: string
+    recipientName?: string
+    tempPassword?: string
+    portalUrl?: string
+    [key: string]: any
+  }
+}
+
+export interface ResendVerificationRequest {
+  email: string
 }
 
 export interface CreateLearnerRequest {

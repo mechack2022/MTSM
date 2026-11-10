@@ -1,22 +1,19 @@
 package com.school.attendance.common.exception;
 
-import com.school.attendance.common.api.MessageKey;
-import lombok.Getter;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
-@Getter
+/**
+ * Exception for business logic violations
+ */
+@ResponseStatus(HttpStatus.BAD_REQUEST)
 public class BusinessException extends RuntimeException {
-    private final MessageKey messageKey;
-    private final String detail;
 
-    public BusinessException(MessageKey messageKey) {
-        super(messageKey.getPropertyKey());
-        this.messageKey = messageKey;
-        this.detail = null;
+    public BusinessException(String message) {
+        super(message);
     }
 
-    public BusinessException(MessageKey messageKey, String detail) {
-        super(messageKey.getPropertyKey() + ": " + detail);
-        this.messageKey = messageKey;
-        this.detail = detail;
+    public BusinessException(String message, Throwable cause) {
+        super(message, cause);
     }
 }

@@ -5,6 +5,7 @@ import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  envDir: '../',
   plugins: [
     react(),
     VitePWA({
@@ -79,7 +80,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
+    port: 3005,
     proxy: {
       '/api': {
         target: 'http://localhost:8080',

@@ -27,12 +27,14 @@ interface AppStore {
   // ==================== AUTHENTICATION ====================
   user: User | null
   token: string | null
+  refreshToken: string | null
   tenant: Tenant | null
   assignedSchools: School[]
 
   setAuth: (data: {
     user: User
     token: string
+    refreshToken?: string
     tenant: Tenant | null
     assignedSchools: School[]
   }) => void
@@ -86,23 +88,33 @@ export const useAppStore = create<AppStore>()(
       // ==================== AUTHENTICATION STATE ====================
       user: null,
       token: null,
+      refreshToken: null,
       tenant: null,
       assignedSchools: [],
 
-      setAuth: ({ user, token, tenant, assignedSchools }) => {
+      setAuth: ({ user, token, refreshToken, tenant, assignedSchools }) => {
+        console.log('Store.setAuth called with:', {
+          userId: user.id,
+          userName: user.fullName,
+          token: token?.substring(0, 20) + '...',
+          role: user.roleName
+        })
         set({
           user,
           token,
+          refreshToken: refreshToken || null,
           tenant,
           assignedSchools,
           selectedSchool: assignedSchools[0] || null,
         })
+        console.log('Store.setAuth completed, state updated')
       },
 
       clearAuth: () => {
         set({
           user: null,
           token: null,
+          refreshToken: null,
           tenant: null,
           assignedSchools: [],
           selectedSchool: null,
@@ -205,15 +217,18 @@ export const useAppStore = create<AppStore>()(
 
       // ==================== COMPUTED VALUES ====================
       get pendingSyncCount() {
-        return get().offlineQueue.filter((a) => !a.synced).length
+        const state = get()
+        return state.offlineQueue?.filter((a) => !a.synced).length || 0
       },
 
       get isAuthenticated() {
-        return !!get().token && !!get().user
+        const state = get()
+        return !!state.token && !!state.user
       },
 
       get hasSchoolAccess() {
-        return get().assignedSchools.length > 0 || get().user?.isPlatformAdmin
+        const state = get()
+        return (state.assignedSchools?.length || 0) > 0 || state.user?.isPlatformAdmin || false
       },
     }),
     {
@@ -224,6 +239,7 @@ export const useAppStore = create<AppStore>()(
       partialize: (state) => ({
         user: state.user,
         token: state.token,
+        refreshToken: state.refreshToken,
         tenant: state.tenant,
         assignedSchools: state.assignedSchools,
         selectedSchool: state.selectedSchool,
@@ -231,6 +247,34 @@ export const useAppStore = create<AppStore>()(
         offlineQueue: state.offlineQueue,
         lastSyncTime: state.lastSyncTime,
       }),
+
+      // Merge persisted state with default state to ensure all properties exist
+      merge: (persistedState, currentState) => {
+        return {
+          ...currentState,
+          ...(persistedState as Partial<AppStore>),
+          // Ensure offlineQueue is always an array
+          offlineQueue: (persistedState as any)?.offlineQueue || [],
+          // Ensure assignedSchools is always an array
+          assignedSchools: (persistedState as any)?.assignedSchools || [],
+        }
+      },
+
+      // Add debugging
+      onRehydrateStorage: () => {
+        console.log('Store: Starting rehydration from localStorage')
+        return (state, error) => {
+          if (error) {
+            console.error('Store: Rehydration failed!', error)
+          } else {
+            console.log('Store: Rehydration completed:', {
+              hasUser: !!state?.user,
+              hasToken: !!state?.token,
+              userName: state?.user?.fullName
+            })
+          }
+        }
+      },
     }
   )
 )

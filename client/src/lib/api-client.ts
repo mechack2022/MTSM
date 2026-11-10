@@ -130,39 +130,39 @@ apiClient.interceptors.response.use(
     // Handle HTTP error responses
     switch (response.status) {
       case 401:
-        // Unauthorized - clear auth and redirect to login
+        // Unauthorized - refresh token or redirect to login
         handleUnauthorized()
         return Promise.reject(
           response.data?.error ||
-            createApiError('UNAUTHORIZED', 'Authentication required')
+            createApiError('UNAUTHORIZED', response.data?.message || 'Authentication required')
         )
 
       case 403:
         // Forbidden
         return Promise.reject(
           response.data?.error ||
-            createApiError('FORBIDDEN', 'Access denied')
+            createApiError('FORBIDDEN', response.data?.message || 'Access denied')
         )
 
       case 404:
         // Not found
         return Promise.reject(
           response.data?.error ||
-            createApiError('NOT_FOUND', 'Resource not found')
+            createApiError('NOT_FOUND', response.data?.message || 'Resource not found')
         )
 
       case 409:
         // Conflict
         return Promise.reject(
           response.data?.error ||
-            createApiError('CONFLICT', 'Resource conflict')
+            createApiError('CONFLICT', response.data?.message || 'Resource conflict')
         )
 
       case 422:
         // Validation error
         return Promise.reject(
           response.data?.error ||
-            createApiError('VALIDATION_ERROR', 'Validation failed')
+            createApiError('VALIDATION_ERROR', response.data?.message || 'Validation failed')
         )
 
       case 500:
@@ -174,7 +174,7 @@ apiClient.interceptors.response.use(
         }
         return Promise.reject(
           response.data?.error ||
-            createApiError('SERVER_ERROR', 'Server error occurred')
+            createApiError('SERVER_ERROR', response.data?.message || 'Server error occurred')
         )
 
       default:
@@ -201,13 +201,38 @@ function createApiError(code: string, message: string): ApiError {
   }
 }
 
-function handleUnauthorized() {
-  // Clear authentication
+async function handleUnauthorized() {
+  // Try to refresh token with Keycloak
+  try {
+    const keycloak = (await import('./keycloak')).default
+    const refreshed = await keycloak.updateToken(30)
+
+    if (refreshed && keycloak.token) {
+      const currentState = useAppStore.getState()
+      if (currentState.user) {
+        useAppStore.getState().setAuth({
+          ...currentState,
+          token: keycloak.token,
+        })
+      }
+      return
+    }
+  } catch (error) {
+    console.error('Token refresh failed:', error)
+  }
+
+  // Clear authentication and redirect
   useAppStore.getState().clearAuth()
 
-  // Redirect to login (if not already there)
-  if (window.location.pathname !== '/login') {
-    window.location.href = '/login'
+  // Use Keycloak login
+  try {
+    const keycloak = (await import('./keycloak')).default
+    keycloak.login()
+  } catch {
+    // Fallback to app login page
+    if (window.location.pathname !== '/') {
+      window.location.href = '/'
+    }
   }
 }
 
@@ -239,31 +264,31 @@ async function retryRequest(config: AxiosRequestConfig): Promise<any> {
 // ============================================================================
 // TYPED API METHODS
 // ============================================================================
-
+// Note: Backend returns data directly without ApiResponse wrapper
 export const api = {
   // GET request
   get: <T = any>(url: string, config?: AxiosRequestConfig) => {
-    return apiClient.get<ApiResponse<T>>(url, config).then((res) => res.data)
+    return apiClient.get<T>(url, config).then((res) => ({ data: res.data }))
   },
 
   // POST request
   post: <T = any>(url: string, data?: any, config?: AxiosRequestConfig) => {
-    return apiClient.post<ApiResponse<T>>(url, data, config).then((res) => res.data)
+    return apiClient.post<T>(url, data, config).then((res) => ({ data: res.data }))
   },
 
   // PUT request
   put: <T = any>(url: string, data?: any, config?: AxiosRequestConfig) => {
-    return apiClient.put<ApiResponse<T>>(url, data, config).then((res) => res.data)
+    return apiClient.put<T>(url, data, config).then((res) => ({ data: res.data }))
   },
 
   // PATCH request
   patch: <T = any>(url: string, data?: any, config?: AxiosRequestConfig) => {
-    return apiClient.patch<ApiResponse<T>>(url, data, config).then((res) => res.data)
+    return apiClient.patch<T>(url, data, config).then((res) => ({ data: res.data }))
   },
 
   // DELETE request
   delete: <T = any>(url: string, config?: AxiosRequestConfig) => {
-    return apiClient.delete<ApiResponse<T>>(url, config).then((res) => res.data)
+    return apiClient.delete<T>(url, config).then((res) => ({ data: res.data }))
   },
 }
 

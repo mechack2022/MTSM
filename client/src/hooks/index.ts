@@ -7,6 +7,7 @@ export * from './use-auth'
 
 // Tenants
 export * from './use-tenants'
+export * from './use-tenant-dashboard'
 
 // Schools
 export * from './use-schools'

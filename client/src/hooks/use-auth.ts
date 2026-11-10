@@ -11,78 +11,65 @@ import { invalidateQueries } from '@/lib/query-client'
 import type { LoginRequest, LoginResponse } from '@/types'
 
 // ============================================================================
-// LOGIN
+// LOGIN (Authorization Code + PKCE)
 // ============================================================================
 
 export function useLogin() {
-  const navigate = useNavigate()
-  const setAuth = useAppStore((state) => state.setAuth)
-
   return useMutation({
-    mutationFn: async (credentials: LoginRequest) => {
-      const response = await api.post<LoginResponse>('/auth/login', credentials)
-      return response.data!
-    },
+    mutationFn: async (_credentials: LoginRequest) => {
+      // Import Keycloak instance
+      const { default: keycloak } = await import('@/lib/keycloak')
 
-    onSuccess: (data) => {
-      // Create user object from response
-      const user = {
-        id: data.userId,
-        tenantId: '',
-        username: data.username,
-        fullName: data.username,
-        roleId: data.role,
-        roleName: data.role,
-        isActive: true,
-        isPlatformAdmin: data.role === 'PLATFORM_ADMIN',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }
-
-      // Save auth data to store
-      setAuth({
-        user,
-        token: data.token,
-        tenant: null,
-        assignedSchools: [],
+      // Trigger Authorization Code + PKCE flow
+      // This will redirect to Keycloak login page
+      await keycloak.login({
+        redirectUri: window.location.origin + '/',
       })
 
-      toast.success(`Welcome back, ${data.username}!`)
-      navigate('/dashboard', { replace: true })
+      // This code won't execute as the user will be redirected
+      // The login completion is handled by KeycloakProvider after redirect
+      return { success: true }
     },
 
     onError: (error: any) => {
-      toast.error(error?.message || 'Login failed. Please check your credentials.')
+      toast.error(error?.message || 'Login failed. Please try again.')
     },
   })
 }
 
 // ============================================================================
-// LOGOUT
+// LOGOUT (Authorization Code + PKCE)
 // ============================================================================
 
 export function useLogout() {
-  const navigate = useNavigate()
   const clearAuth = useAppStore((state) => state.clearAuth)
 
   return useMutation({
     mutationFn: async () => {
-      // Optional: call logout endpoint if you have one
-      // await api.post('/auth/logout')
-      return true
-    },
+      // Import Keycloak instance
+      const { default: keycloak } = await import('@/lib/keycloak')
 
-    onSuccess: () => {
       // Clear all cached data
       invalidateQueries.all()
 
-      // Clear auth state
+      // Clear local auth state
       clearAuth()
 
-      toast.success('Logged out successfully')
+      // Trigger Keycloak logout
+      // This will redirect to Keycloak logout page, then back to our app
+      await keycloak.logout({
+        redirectUri: window.location.origin + '/',
+      })
 
-      // Navigate to login
-      navigate('/login')
+      return { success: true }
+    },
+
+    onError: (error: any) => {
+      console.error('Logout error:', error)
+      // Clear local state anyway
+      invalidateQueries.all()
+      useAppStore.getState().clearAuth()
+      toast.error('Logout encountered an issue, but local session was cleared')
     },
   })
 }

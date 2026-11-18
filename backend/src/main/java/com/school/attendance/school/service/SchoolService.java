@@ -174,11 +174,11 @@ public class SchoolService {
                 .state(state)
                 .localGovernment(localGovernment)
                 .physicalAddress(request.physicalAddress())
-                .schoolHeadUserId(savedUser.getId())  // Reference user by ID
+                .schoolHeadUserId(savedUser.getId())
                 .seatCapacity(request.seatCapacity())
                 .currentStudents(0)
                 .currentTeachers(0)
-                .status(School.SchoolStatus.ACTIVE)
+                .status(School.SchoolStatus.INACTIVE)
                 .build();
 
         School savedSchool = schoolRepository.save(school);
@@ -425,9 +425,45 @@ public class SchoolService {
         return schoolRepository.sumCurrentTeachersByTenantId(tenantId);
     }
 
-    /**
-     * Helper method to convert School entity to SchoolResponse DTO with User information
-     */
+    @Transactional(readOnly = true)
+    public List<SchoolResponse> getSchoolsBySchoolHead(UUID userId) {
+        return schoolRepository.findBySchoolHeadUserId(userId).stream()
+                .map(this::toSchoolResponse)
+                .toList();
+    }
+
+    @Transactional
+    public SchoolResponse activateSchool(UUID id, UUID tenantId) {
+        School school = schoolRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("School not found with id: " + id));
+
+        if (!school.getTenantId().equals(tenantId)) {
+            throw new ResourceNotFoundException("School not found with id: " + id);
+        }
+
+        school.setStatus(School.SchoolStatus.ACTIVE);
+        School updatedSchool = schoolRepository.save(school);
+        log.info("Activated school: {} ({}) for tenant: {}", updatedSchool.getName(), updatedSchool.getCampusCode(), tenantId);
+
+        return toSchoolResponse(updatedSchool);
+    }
+
+    @Transactional
+    public SchoolResponse deactivateSchool(UUID id, UUID tenantId) {
+        School school = schoolRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("School not found with id: " + id));
+
+        if (!school.getTenantId().equals(tenantId)) {
+            throw new ResourceNotFoundException("School not found with id: " + id);
+        }
+
+        school.setStatus(School.SchoolStatus.INACTIVE);
+        School updatedSchool = schoolRepository.save(school);
+        log.info("Deactivated school: {} ({}) for tenant: {}", updatedSchool.getName(), updatedSchool.getCampusCode(), tenantId);
+
+        return toSchoolResponse(updatedSchool);
+    }
+
     private SchoolResponse toSchoolResponse(School school) {
         User schoolHeadUser = userRepository.findById(school.getSchoolHeadUserId())
                 .orElse(null);

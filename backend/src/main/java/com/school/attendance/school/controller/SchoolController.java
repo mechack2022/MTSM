@@ -50,6 +50,24 @@ public class SchoolController {
         return ResponseEntity.ok(schools);
     }
 
+    @GetMapping("/my-schools")
+    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
+    public ResponseEntity<List<SchoolResponse>> getMySchools(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal Jwt jwt) {
+        String schoolId = jwt.getClaimAsString("school_id");
+        if (schoolId == null || schoolId.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        String tenantId = jwt.getClaimAsString("tenant_id");
+        if (tenantId == null || tenantId.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        SchoolResponse school = schoolService.getSchoolById(UUID.fromString(schoolId), UUID.fromString(tenantId));
+        return ResponseEntity.ok(List.of(school));
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('TENANT_ADMIN', 'SCHOOL_ADMIN', 'PRINCIPAL', 'HEAD_TEACHER')")
     public ResponseEntity<SchoolResponse> getSchoolById(
@@ -150,5 +168,31 @@ public class SchoolController {
         }
         int total = schoolService.sumCurrentTeachers(UUID.fromString(tenantId));
         return ResponseEntity.ok(total);
+    }
+
+    @PostMapping("/{id}/activate")
+    @PreAuthorize("hasRole('TENANT_ADMIN')")
+    public ResponseEntity<SchoolResponse> activateSchool(
+            @PathVariable UUID id,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal Jwt jwt) {
+        String tenantId = jwt.getClaimAsString("tenant_id");
+        if (tenantId == null || tenantId.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        SchoolResponse school = schoolService.activateSchool(id, UUID.fromString(tenantId));
+        return ResponseEntity.ok(school);
+    }
+
+    @PostMapping("/{id}/deactivate")
+    @PreAuthorize("hasRole('TENANT_ADMIN')")
+    public ResponseEntity<SchoolResponse> deactivateSchool(
+            @PathVariable UUID id,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal Jwt jwt) {
+        String tenantId = jwt.getClaimAsString("tenant_id");
+        if (tenantId == null || tenantId.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        SchoolResponse school = schoolService.deactivateSchool(id, UUID.fromString(tenantId));
+        return ResponseEntity.ok(school);
     }
 }

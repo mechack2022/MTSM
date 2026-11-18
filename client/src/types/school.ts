@@ -14,15 +14,26 @@ export enum SchoolStatus {
   SUSPENDED = 'SUSPENDED',
 }
 
+export enum EducationalTier {
+  EARLY_YEARS = 'EARLY_YEARS',
+  PRIMARY = 'PRIMARY',
+  JUNIOR_SECONDARY = 'JUNIOR_SECONDARY',
+  SENIOR_SECONDARY = 'SENIOR_SECONDARY',
+}
+
 export interface School {
   id: string
   tenantId: string
   name: string
   campusCode: string
   topology: Topology
-  educationalLevel: string
-  stateOfLocation?: string | null
+  educationalTiers: EducationalTier[]
+  stateId?: string | null
+  stateName?: string | null
+  localGovernmentId?: string | null
+  localGovernmentName?: string | null
   physicalAddress?: string | null
+  schoolHeadUserId?: string | null
   schoolHeadName?: string | null // Combined full name returned by backend
   schoolHeadEmail?: string | null
   schoolHeadPhone?: string | null

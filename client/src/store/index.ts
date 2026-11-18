@@ -218,17 +218,23 @@ export const useAppStore = create<AppStore>()(
       // ==================== COMPUTED VALUES ====================
       get pendingSyncCount() {
         const state = get()
-        return state.offlineQueue?.filter((a) => !a.synced).length || 0
+        if (!state || !Array.isArray(state.offlineQueue)) {
+          return 0
+        }
+        return state.offlineQueue.filter((a) => !a.synced).length
       },
 
       get isAuthenticated() {
         const state = get()
-        return !!state.token && !!state.user
+        return !!state?.token && !!state?.user
       },
 
       get hasSchoolAccess() {
         const state = get()
-        return (state.assignedSchools?.length || 0) > 0 || state.user?.isPlatformAdmin || false
+        if (!state) return false
+        return (Array.isArray(state.assignedSchools) && state.assignedSchools.length > 0) ||
+               state.user?.isPlatformAdmin ||
+               false
       },
     }),
     {
@@ -250,14 +256,39 @@ export const useAppStore = create<AppStore>()(
 
       // Merge persisted state with default state to ensure all properties exist
       merge: (persistedState, currentState) => {
-        return {
+        const merged = {
           ...currentState,
           ...(persistedState as Partial<AppStore>),
-          // Ensure offlineQueue is always an array
-          offlineQueue: (persistedState as any)?.offlineQueue || [],
-          // Ensure assignedSchools is always an array
-          assignedSchools: (persistedState as any)?.assignedSchools || [],
         }
+
+        // Fix corrupted string 'null' values from localStorage
+        if (merged.token === 'null' || merged.token === 'undefined') {
+          merged.token = null
+        }
+        if (merged.refreshToken === 'null' || merged.refreshToken === 'undefined') {
+          merged.refreshToken = null
+        }
+        if (merged.user === 'null' || merged.user === 'undefined' || (merged.user as any) === null) {
+          merged.user = null
+        }
+        if (merged.tenant === 'null' || merged.tenant === 'undefined' || (merged.tenant as any) === null) {
+          merged.tenant = null
+        }
+        if (merged.selectedSchool === 'null' || merged.selectedSchool === 'undefined' || (merged.selectedSchool as any) === null) {
+          merged.selectedSchool = null
+        }
+
+        // Ensure offlineQueue is always an array (before getters are accessed)
+        if (!merged.offlineQueue || !Array.isArray(merged.offlineQueue)) {
+          merged.offlineQueue = []
+        }
+
+        // Ensure assignedSchools is always an array
+        if (!merged.assignedSchools || !Array.isArray(merged.assignedSchools)) {
+          merged.assignedSchools = []
+        }
+
+        return merged
       },
 
       // Add debugging

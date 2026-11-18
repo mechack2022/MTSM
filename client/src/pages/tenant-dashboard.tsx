@@ -6,6 +6,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store'
+import { useSchools, useActivateSchool, useDeactivateSchool } from '@/hooks/use-schools'
 
 // ============================================================================
 // COMPONENT
@@ -14,6 +15,21 @@ import { useAppStore } from '@/store'
 export default function TenantDashboardPage() {
   const navigate = useNavigate()
   const { user } = useAppStore()
+  const { data: schools = [], isLoading } = useSchools()
+  const { mutate: activateSchool, isPending: isActivating } = useActivateSchool()
+  const { mutate: deactivateSchool, isPending: isDeactivating } = useDeactivateSchool()
+
+  const handleActivate = (schoolId: string) => {
+    if (confirm('Are you sure you want to activate this school?')) {
+      activateSchool(schoolId)
+    }
+  }
+
+  const handleDeactivate = (schoolId: string) => {
+    if (confirm('Are you sure you want to deactivate this school?')) {
+      deactivateSchool(schoolId)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -313,83 +329,92 @@ export default function TenantDashboardPage() {
                   </div>
 
                   {/* Campus Cards */}
-                  {[
-                    {
-                      name: 'Crown Jewel High School - Lekki Campus',
-                      type: 'Senior & Junior Secondary (JSS1 – SS3) • WAEC / Cambridge IGCSE',
-                      head: 'Mrs. Folake Balogun',
-                      students: 520,
-                      teachers: 38,
-                      icon: 'school',
-                      color: 'blue',
-                    },
-                    {
-                      name: 'Crown Jewel Preparatory - Ikeja',
-                      type: 'Nursery & Primary (Crèche – Basic 6) • National & Early Years Curriculum',
-                      head: 'Mr. Kenneth Okafor',
-                      students: 382,
-                      teachers: 28,
-                      icon: 'child_care',
-                      color: 'green',
-                    },
-                    {
-                      name: 'Crown Jewel Academy - Abuja FCT',
-                      type: 'Comprehensive Primary & Secondary • Day & Boarding Facilities',
-                      head: 'Dr. Amina Bello',
-                      students: 240,
-                      teachers: 18,
-                      icon: 'apartment',
-                      color: 'amber',
-                    },
-                  ].map((campus, idx) => (
-                    <div key={idx} className="p-6 rounded-xl bg-white shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row gap-6 items-start md:items-center justify-between border border-gray-100">
+                  {isLoading ? (
+                    <div className="p-6 text-center">
+                      <div className="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                      <p className="mt-2 text-sm text-gray-600">Loading schools...</p>
+                    </div>
+                  ) : schools.length === 0 ? (
+                    <div className="p-6 text-center bg-gray-50 rounded-xl">
+                      <p className="text-sm text-gray-600">No schools found. Create your first school to get started.</p>
+                    </div>
+                  ) : (
+                    schools.map((school) => (
+                    <div key={school.id} className="p-6 rounded-xl bg-white shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row gap-6 items-start md:items-center justify-between border border-gray-100">
                       <div className="flex gap-4 items-start flex-1 min-w-0">
-                        <div className={`w-14 h-14 rounded-xl bg-${campus.color}-100 text-${campus.color}-600 flex items-center justify-center shrink-0`}>
+                        <div className="w-14 h-14 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
                           <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                           </svg>
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2.5 flex-wrap">
-                            <h3 className="text-lg font-semibold text-gray-900 tracking-tight truncate">{campus.name}</h3>
-                            <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[11px] font-bold uppercase">Fully Synced</span>
+                            <h3 className="text-lg font-semibold text-gray-900 tracking-tight truncate">{school.name}</h3>
+                            {school.status === 'ACTIVE' ? (
+                              <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[11px] font-bold uppercase">Active</span>
+                            ) : school.status === 'INACTIVE' ? (
+                              <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[11px] font-bold uppercase">Inactive</span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[11px] font-bold uppercase">Suspended</span>
+                            )}
                           </div>
-                          <p className="text-xs text-gray-600 mt-1">{campus.type}</p>
+                          <p className="text-xs text-gray-600 mt-1">{school.topology} • {school.educationalTiers.join(', ')}</p>
                           <div className="flex items-center gap-6 mt-3.5 pt-3 bg-gray-50 px-3 py-2 rounded-lg text-gray-600 text-xs">
                             <div className="flex items-center gap-1.5">
                               <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                               </svg>
-                              <span>Head: <strong className="text-gray-900 font-semibold">{campus.head}</strong></span>
+                              <span>Head: <strong className="text-gray-900 font-semibold">{school.schoolHeadName || 'N/A'}</strong></span>
                             </div>
                             <div className="hidden sm:flex items-center gap-1.5">
                               <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                               </svg>
-                              <span><strong>{campus.students}</strong> Students</span>
+                              <span><strong>{school.currentStudents}</strong> Students</span>
                             </div>
                             <div className="hidden sm:flex items-center gap-1.5">
                               <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
                               </svg>
-                              <span><strong>{campus.teachers}</strong> Teachers</span>
+                              <span><strong>{school.currentTeachers}</strong> Teachers</span>
                             </div>
                           </div>
                         </div>
                       </div>
                       <div className="flex flex-row md:flex-col items-center md:items-end gap-2 w-full md:w-auto shrink-0 pt-2 md:pt-0">
-                        <button className="w-full md:w-auto px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-all flex items-center justify-center gap-1.5 shadow-sm">
-                          <span>Enter Portal</span>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                        </button>
-                        <button className="w-full md:w-auto px-4 py-2 rounded-lg bg-gray-100 text-gray-600 text-xs font-semibold hover:bg-gray-200 transition-all">
-                          Manage Settings
-                        </button>
+                        {school.status === 'ACTIVE' ? (
+                          <>
+                            <button className="w-full md:w-auto px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-all flex items-center justify-center gap-1.5 shadow-sm">
+                              <span>Enter Portal</span>
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => handleDeactivate(school.id)}
+                              disabled={isDeactivating}
+                              className="w-full md:w-auto px-4 py-2 rounded-lg bg-red-100 text-red-600 text-xs font-semibold hover:bg-red-200 transition-all disabled:opacity-50"
+                            >
+                              Deactivate
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => handleActivate(school.id)}
+                              disabled={isActivating}
+                              className="w-full md:w-auto px-4 py-2 rounded-lg bg-green-600 text-white text-xs font-semibold hover:bg-green-700 transition-all disabled:opacity-50"
+                            >
+                              Activate School
+                            </button>
+                            <button className="w-full md:w-auto px-4 py-2 rounded-lg bg-gray-100 text-gray-600 text-xs font-semibold hover:bg-gray-200 transition-all">
+                              Manage Settings
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
-                  ))}
+                  )))}
 
                   {/* Add Campus CTA */}
                   <button className="group p-6 rounded-xl bg-gray-50 hover:bg-gray-100 transition-all flex items-center justify-center gap-3 text-center border border-gray-200 border-dashed">

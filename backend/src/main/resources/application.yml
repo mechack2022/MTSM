@@ -57,7 +57,7 @@ spring:
     baseline-version: 0
     validate-on-migrate: true
     out-of-order: false
-    clean-disabled: true  # Safety: prevent accidental data loss
+    clean-disabled: true
 
   # ===========================================================================
   # SECURITY - KEYCLOAK OAuth2 RESOURCE SERVER

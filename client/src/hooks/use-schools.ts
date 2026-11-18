@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 import api from '@/lib/api-client'
 import { queryKeys } from '@/lib/query-client'
 import type { School, CreateSchoolRequest, UpdateSchoolRequest } from '@/types/school'
+import { useCurrentContext } from '@/store'
 
 // ============================================================================
 // QUERY HOOKS
@@ -33,6 +34,25 @@ export function useSchool(schoolId: string | null) {
     },
     enabled: !!schoolId,
     staleTime: 15 * 60 * 1000, // 15 minutes
+  })
+}
+
+/**
+ * Hook to get the current school admin's school from context
+ * For school admins, this returns their assigned school
+ */
+export function useCurrentSchool() {
+  const { selectedSchool } = useCurrentContext()
+
+  return useQuery({
+    queryKey: queryKeys.schools.detail(selectedSchool?.id!),
+    queryFn: async () => {
+      const response = await api.get<School>(`/schools/${selectedSchool?.id}`)
+      return response.data!
+    },
+    enabled: !!selectedSchool?.id,
+    staleTime: 15 * 60 * 1000, // 15 minutes
+    initialData: selectedSchool || undefined,
   })
 }
 
@@ -85,6 +105,48 @@ export function useUpdateSchool() {
 
     onError: (error: any) => {
       toast.error(error?.message || 'Failed to update school')
+    },
+  })
+}
+
+export function useActivateSchool() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await api.post<School>(`/schools/${id}/activate`)
+      return response.data!
+    },
+
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.schools.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.schools.detail(data.id) })
+      toast.success(`School "${data.name}" activated successfully!`)
+    },
+
+    onError: (error: any) => {
+      toast.error(error?.message || 'Failed to activate school')
+    },
+  })
+}
+
+export function useDeactivateSchool() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await api.post<School>(`/schools/${id}/deactivate`)
+      return response.data!
+    },
+
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.schools.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.schools.detail(data.id) })
+      toast.success(`School "${data.name}" deactivated successfully!`)
+    },
+
+    onError: (error: any) => {
+      toast.error(error?.message || 'Failed to deactivate school')
     },
   })
 }

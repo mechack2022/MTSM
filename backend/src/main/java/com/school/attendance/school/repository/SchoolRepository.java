@@ -45,4 +45,7 @@ public interface SchoolRepository extends JpaRepository<School, UUID> {
 
     @Query("SELECT COALESCE(SUM(s.currentTeachers), 0) FROM School s WHERE s.tenantId = :tenantId AND s.status = 'ACTIVE' AND s.deletedAt IS NULL")
     int sumCurrentTeachersByTenantId(UUID tenantId);
+
+    @Query("SELECT s FROM School s WHERE s.schoolHeadUserId = :userId AND s.deletedAt IS NULL ORDER BY s.name")
+    List<School> findBySchoolHeadUserId(UUID userId);
 }

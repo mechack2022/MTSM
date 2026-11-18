@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from 'react'
+import { ReactNode, useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import keycloak from './keycloak'
 import { useAppStore } from '@/store'
@@ -11,6 +11,7 @@ interface KeycloakProviderProps {
 
 export function KeycloakProvider({ children }: KeycloakProviderProps) {
   const [initialized, setInitialized] = useState(false)
+  const initRef = useRef(false)
   const navigate = useNavigate()
   const setAuth = useAppStore((state) => state.setAuth)
   const clearAuth = useAppStore((state) => state.clearAuth)
@@ -46,6 +47,13 @@ export function KeycloakProvider({ children }: KeycloakProviderProps) {
   }
 
   useEffect(() => {
+    // Guard against multiple initializations (React StrictMode, component remounts)
+    if (initRef.current) {
+      console.log('Keycloak already initialized, skipping...')
+      return
+    }
+    initRef.current = true
+
     // Initialize Keycloak with Authorization Code + PKCE flow
     keycloak
       .init({
@@ -54,12 +62,11 @@ export function KeycloakProvider({ children }: KeycloakProviderProps) {
         pkceMethod: 'S256',
         checkLoginIframe: false,
       })
-      .then((authenticated) => {
+      .then(async (authenticated) => {
         console.log('Keycloak initialized:', { authenticated })
         setInitialized(true)
 
         if (authenticated && keycloak.token && keycloak.tokenParsed) {
-          // User is already authenticated (SSO or returning user)
           const tokenParsed = keycloak.tokenParsed
           const roles = tokenParsed.realm_access?.roles || []
 
@@ -86,9 +93,6 @@ export function KeycloakProvider({ children }: KeycloakProviderProps) {
             updatedAt: new Date().toISOString(),
           }
 
-          // DISABLED: Fetching tenant data causes infinite loop
-          // Even though JWT has tenant_id, the /tenants/me endpoint might not be ready
-          // Backend will use tenant_id from JWT directly, so we don't need to fetch it here
           setAuth({
             user,
             token: keycloak.token,
@@ -96,6 +100,23 @@ export function KeycloakProvider({ children }: KeycloakProviderProps) {
             tenant: null,
             assignedSchools: [],
           })
+
+          if (role === 'SCHOOL_ADMIN') {
+            try {
+              const response = await api.get('/schools/my-schools')
+              const schools = response.data || []
+              setAuth({
+                user,
+                token: keycloak.token,
+                refreshToken: keycloak.refreshToken,
+                tenant: null,
+                assignedSchools: schools,
+              })
+              console.log('School admin assigned schools:', schools)
+            } catch (error) {
+              console.error('Failed to fetch assigned schools:', error)
+            }
+          }
 
           console.log('User authenticated via SSO:', user)
         }

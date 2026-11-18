@@ -62,6 +62,8 @@ import AddStaffPage from '@/pages/add-staff'
 import EditStaffPage from '@/pages/edit-staff'
 import AddStaffSuccessPage from '@/pages/add-staff-success'
 import EmploymentAssignmentsPage from '@/pages/employment-assignments'
+import ClassesManagementPage from '@/pages/classes-management'
+import ClassStreamConfigurationPage from '@/pages/class-stream-configuration'
 
 // ============================================================================
 // PROTECTED ROUTE COMPONENT
@@ -415,6 +417,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <EmploymentAssignmentsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/classes-management"
+        element={
+          <ProtectedRoute>
+            <ClassesManagementPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/class-streams/:classId"
+        element={
+          <ProtectedRoute>
+            <ClassStreamConfigurationPage />
           </ProtectedRoute>
         }
       />

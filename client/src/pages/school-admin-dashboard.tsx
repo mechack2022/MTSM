@@ -8,56 +8,80 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLogout } from '@/hooks/use-auth'
-
-// This would normally come from API/context based on logged-in user's school
-// For now, we'll use state to demonstrate the concept
-interface SchoolTopology {
-  type: 'all-in-one' | 'standalone' | 'distributed'
-  enabledSections: {
-    nursery: boolean
-    primary: boolean
-    juniorSecondary: boolean
-    seniorSecondary: boolean
-  }
-  schoolName: string
-  branch: string
-  campusCode: string
-}
+import { useCurrentSchool } from '@/hooks/use-schools'
 
 export default function SchoolAdminDashboard() {
   const navigate = useNavigate()
   const { mutate: logout } = useLogout()
 
-  // This topology config would come from the backend based on how the tenant admin
-  // configured this school when they created it
-  const [schoolTopology] = useState<SchoolTopology>({
-    type: 'all-in-one',
-    enabledSections: {
-      nursery: true,
-      primary: true,
-      juniorSecondary: true,
-      seniorSecondary: true,
-    },
-    schoolName: 'Grace Crest Academy',
-    branch: 'Lekki Branch',
-    campusCode: 'CJET-LK-01',
-  })
+  // Fetch the current school admin's school
+  const { data: school, isLoading: isLoadingSchool } = useCurrentSchool()
+
+  // Map topology from backend to UI format
+  const getTopologyType = () => {
+    if (!school) return 'all-in-one'
+    if (school.topology === 'COMPOSITE') return 'all-in-one'
+    if (school.topology === 'STANDALONE') return 'standalone'
+    if (school.topology === 'SATELLITE') return 'distributed'
+    return 'all-in-one'
+  }
+
+  // Map educational tiers to enabled sections
+  const getEnabledSections = () => {
+    if (!school?.educationalTiers) {
+      return {
+        nursery: false,
+        primary: false,
+        juniorSecondary: false,
+        seniorSecondary: false,
+      }
+    }
+    return {
+      nursery: school.educationalTiers.includes('EARLY_YEARS'),
+      primary: school.educationalTiers.includes('PRIMARY'),
+      juniorSecondary: school.educationalTiers.includes('JUNIOR_SECONDARY'),
+      seniorSecondary: school.educationalTiers.includes('SENIOR_SECONDARY'),
+    }
+  }
+
+  const schoolTopology = {
+    type: getTopologyType(),
+    enabledSections: getEnabledSections(),
+    schoolName: school?.name || 'Loading...',
+    branch: school?.localGovernmentName || school?.stateName || '',
+    campusCode: school?.campusCode || '',
+  }
 
   const [selectedSection, setSelectedSection] = useState<'all' | 'ey' | 'pri' | 'jss' | 'sss'>('all')
   const [staffManagementOpen, setStaffManagementOpen] = useState(false)
 
-  // Calculate totals based on enabled sections
+  // Calculate totals based on real school data
   const getTotalPupils = () => {
-    let total = 0
-    if (schoolTopology.enabledSections.nursery) total += 140
-    if (schoolTopology.enabledSections.primary) total += 320
-    if (schoolTopology.enabledSections.juniorSecondary) total += 245
-    if (schoolTopology.enabledSections.seniorSecondary) total += 215
-    return total
+    return school?.currentStudents || 0
+  }
+
+  const getTotalTeachers = () => {
+    return school?.currentTeachers || 0
+  }
+
+  const getSeatCapacity = () => {
+    return school?.seatCapacity || 0
   }
 
   const getEnabledSectionsCount = () => {
     return Object.values(schoolTopology.enabledSections).filter(Boolean).length
+  }
+
+  // Loading state
+  if (isLoadingSchool || !school) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-gray-600 font-medium">Loading school information...</span>
+        </div>
+      </div>
+    )
   }
 
   const handleSectionSwitch = (section: 'all' | 'ey' | 'pri' | 'jss' | 'sss') => {
@@ -171,6 +195,15 @@ export default function SchoolAdminDashboard() {
                 </div>
               )}
             </div>
+            <button
+              onClick={() => navigate('/classes-management')}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all font-medium text-sm text-left"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              <span>Classes, Streams & Arms Management</span>
+            </button>
             <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all font-medium text-sm text-left">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -273,8 +306,8 @@ export default function SchoolAdminDashboard() {
                 </svg>
               </div>
               <div className="hidden md:flex flex-col text-left">
-                <span className="text-sm font-bold text-gray-900 leading-tight">Mrs. Folake Balogun</span>
-                <span className="text-xs text-gray-600 leading-tight">School Administrator / Registrar</span>
+                <span className="text-sm font-bold text-gray-900 leading-tight">{school?.schoolHeadName || 'School Admin'}</span>
+                <span className="text-xs text-gray-600 leading-tight">School Administrator</span>
               </div>
             </div>
           </div>
@@ -1938,9 +1971,9 @@ export default function SchoolAdminDashboard() {
                       <span className="material-symbols-outlined text-2xl">admin_panel_settings</span>
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-gray-900">Lekki Campus Primary Admin Desk</h3>
+                      <h3 className="text-sm font-bold text-gray-900">{school?.name} Admin Desk</h3>
                       <p className="text-xs text-gray-600">
-                        Managing registrar: Mrs. Folake Balogun · Shift logs archived to local core node.
+                        Managing registrar: {school?.schoolHeadName || 'School Admin'} · Shift logs archived to local core node.
                       </p>
                     </div>
                   </div>

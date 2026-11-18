@@ -2,6 +2,7 @@ package com.school.attendance.tenant.dto;
 
 import com.school.attendance.school.dto.SchoolResponse;
 import com.school.attendance.tenant.entity.Tenant;
+import com.school.attendance.user.entity.User;
 import lombok.Builder;
 
 import java.time.Instant;
@@ -18,8 +19,8 @@ public record TenantDashboardResponse(
     String cacNumber,
     String subdomain,
     String address,
+    UUID contactUserId,
     String contactName,
-    String roleTitle,
     String contactEmail,
     String contactPhone,
     String stateName,
@@ -68,10 +69,21 @@ public record TenantDashboardResponse(
 
     public static TenantDashboardResponse from(
         Tenant tenant,
-        boolean emailVerified,
+        User contactUser,
         List<SchoolResponse> schools,
         Statistics statistics
     ) {
+        // Build full name from user's firstName and lastName
+        String fullName = null;
+        if (contactUser != null) {
+            String firstName = contactUser.getFirstName() != null ? contactUser.getFirstName() : "";
+            String lastName = contactUser.getLastName() != null ? contactUser.getLastName() : "";
+            fullName = (firstName + " " + lastName).trim();
+            if (fullName.isEmpty()) {
+                fullName = null;
+            }
+        }
+
         return TenantDashboardResponse.builder()
             // Basic Information
             .tenantId(tenant.getId())
@@ -80,10 +92,10 @@ public record TenantDashboardResponse(
             .cacNumber(tenant.getCacNumber())
             .subdomain(tenant.getSubdomain())
             .address(tenant.getAddress())
-            .contactName(tenant.getContactName())
-            .roleTitle(tenant.getRoleTitle())
-            .contactEmail(tenant.getContactEmail())
-            .contactPhone(tenant.getContactPhone())
+            .contactUserId(tenant.getContactUserId())
+            .contactName(fullName)
+            .contactEmail(contactUser != null ? contactUser.getEmail() : null)
+            .contactPhone(contactUser != null ? contactUser.getPhone() : null)
             .stateName(tenant.getState() != null ? tenant.getState().getName() : null)
             .localGovernmentName(tenant.getLocalGovernment() != null ? tenant.getLocalGovernment().getName() : null)
 
@@ -94,7 +106,7 @@ public record TenantDashboardResponse(
             .billingCycle(tenant.getBillingCycle())
             .subscriptionStartDate(tenant.getSubscriptionStartDate())
             .subscriptionEndDate(tenant.getSubscriptionEndDate())
-            .emailVerified(emailVerified)
+            .emailVerified(contactUser != null ? contactUser.getEmailVerified() : false)
 
             // Statistics
             .statistics(statistics)

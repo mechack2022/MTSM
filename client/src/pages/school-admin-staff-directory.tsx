@@ -13,6 +13,7 @@
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useLogout } from '@/hooks/use-auth'
 
 // Staff members data with section assignments
 const ALL_STAFF = [
@@ -140,6 +141,7 @@ const ALL_STAFF = [
 
 export default function SchoolAdminStaffDirectoryPage() {
   const navigate = useNavigate()
+  const { mutate: logout } = useLogout()
   const [staffManagementOpen, setStaffManagementOpen] = useState(true)
   const [selectedScope, setSelectedScope] = useState('Whole School')
   const [selectedStatus, setSelectedStatus] = useState('All')
@@ -306,6 +308,19 @@ export default function SchoolAdminStaffDirectoryPage() {
               <span className="text-[11px] font-bold text-blue-600">CJET-LK-01</span>
             </div>
           </div>
+        </div>
+
+        {/* Logout Button */}
+        <div className="px-4 pb-4">
+          <button
+            onClick={() => logout()}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 transition-all font-medium text-sm border border-red-200 hover:border-red-300"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            <span>Log Out</span>
+          </button>
         </div>
       </aside>
 

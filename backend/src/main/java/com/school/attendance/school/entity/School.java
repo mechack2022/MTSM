@@ -63,14 +63,12 @@ public class School {
     @Column(length = 500)
     private String physicalAddress;
 
-    @Column(length = 100)
-    private String schoolHeadName;
-
-    @Column(length = 100)
-    private String schoolHeadEmail;
-
-    @Column(length = 20)
-    private String schoolHeadPhone;
+    /**
+     * Reference to the school head/administrator.
+     * This user will have SCHOOL_ADMIN role assigned in the user_roles table.
+     */
+    @Column(name = "school_head_user_id", nullable = false)
+    private UUID schoolHeadUserId;
 
     @Column(nullable = false)
     private Integer seatCapacity;

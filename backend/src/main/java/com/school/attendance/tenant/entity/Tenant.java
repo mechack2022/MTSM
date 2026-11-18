@@ -48,17 +48,12 @@ public class Tenant {
     @Column(length = 500)
     private String address;
 
-    @Column(length = 200)
-    private String contactName;
-
-    @Column(length = 100)
-    private String roleTitle;
-
-    @Column(nullable = false, unique = true, length = 100)
-    private String contactEmail;
-
-    @Column(unique = true, length = 20)
-    private String contactPhone;
+    /**
+     * Reference to the tenant administrator (contact person).
+     * This user will have TENANT_ADMIN role assigned in the user_roles table.
+     */
+    @Column(name = "contact_user_id", nullable = false)
+    private UUID contactUserId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

@@ -58,4 +58,20 @@ public class EmailVerificationController {
                 "message", "Verification email has been resent. Please check your inbox."
         ));
     }
+
+    /**
+     * Get verification status and metadata (for retrieving temporary password)
+     */
+    @GetMapping("/status")
+    @Operation(summary = "Get verification status by email")
+    public ResponseEntity<Map<String, Object>> getVerificationStatus(@RequestParam String email) {
+        log.info("Verification status request for: {}", email);
+
+        Map<String, Object> status = verificationService.getVerificationStatus(
+                email,
+                EmailVerification.VerificationType.TENANT_ADMIN
+        );
+
+        return ResponseEntity.ok(status);
+    }
 }

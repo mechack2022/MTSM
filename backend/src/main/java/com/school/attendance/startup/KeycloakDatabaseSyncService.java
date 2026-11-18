@@ -1,12 +1,13 @@
 package com.school.attendance.startup;
 
 import com.school.attendance.keycloak.KeycloakUserService;
-import com.school.attendance.tenant.repository.TenantRepository;
+import com.school.attendance.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Service;
 
 import java.util.HashSet;
@@ -21,9 +22,15 @@ import java.util.Set;
  * create-drop, causing users to exist in Keycloak but not in the application.
  *
  * This service runs on application startup and:
- * 1. Identifies orphaned Keycloak users (users that don't have corresponding tenant records)
+ * 1. Identifies orphaned Keycloak users (users that don't have corresponding user records)
  * 2. Removes these orphaned users from Keycloak
  * 3. Ensures database and Keycloak are in sync
+ *
+ * Now uses the unified users table which contains ALL user types:
+ * - Tenant administrators
+ * - School administrators
+ * - Platform administrators
+ * - Teachers, staff, etc.
  */
 @Slf4j
 @Service
@@ -31,21 +38,22 @@ import java.util.Set;
 public class KeycloakDatabaseSyncService {
 
     private final KeycloakUserService keycloakUserService;
-    private final TenantRepository tenantRepository;
+    private final UserRepository userRepository;
 
     @EventListener(ApplicationReadyEvent.class)
+    @Order(2) // Run after PlatformAdminBootstrap
     public void syncKeycloakWithDatabase() {
         log.info("=".repeat(80));
         log.info("Starting Keycloak-Database synchronization check...");
         log.info("=".repeat(80));
 
         try {
-            // Get all email addresses from tenants in database
-            Set<String> validEmails = new HashSet<>(tenantRepository.findAllContactEmails());
-            log.info("Found {} tenant contact emails in database", validEmails.size());
+            // Get all email addresses from the unified users table (includes all user types)
+            Set<String> validEmails = new HashSet<>(userRepository.findAllEmails());
+            log.info("Found {} user emails in database", validEmails.size());
 
-            // Get all users from Keycloak with tenant_admin role
-            List<UserRepresentation> keycloakUsers = getAllTenantAdmins();
+            // Get all users from Keycloak
+            List<UserRepresentation> keycloakUsers = getAllKeycloakUsers();
             log.info("Found {} users in Keycloak", keycloakUsers.size());
 
             int orphanedCount = 0;
@@ -82,7 +90,7 @@ public class KeycloakDatabaseSyncService {
             log.info("Keycloak-Database synchronization completed!");
             log.info("  - Users in sync: {}", syncedCount);
             log.info("  - Orphaned users cleaned up: {}", orphanedCount);
-            log.info("  - Total tenants in database: {}", validEmails.size());
+            log.info("  - Total users in database: {}", validEmails.size());
             log.info("=".repeat(80));
 
         } catch (Exception e) {
@@ -92,21 +100,15 @@ public class KeycloakDatabaseSyncService {
     }
 
     /**
-     * Get all Keycloak users - in a real system, you'd filter by tenant_admin role
-     * For now, we'll get all users and filter those with tenant_id attribute
+     * Get all Keycloak users from the configured realm
      */
-    private List<UserRepresentation> getAllTenantAdmins() {
+    private List<UserRepresentation> getAllKeycloakUsers() {
         try {
             var realmResource = keycloakUserService.getKeycloak().realm(keycloakUserService.getConfig().getRealm());
 
-            // Get all users (you might want to add pagination for large user bases)
-            List<UserRepresentation> allUsers = realmResource.users().list();
-
-            // Filter users that have tenant_id attribute (these are tenant admins)
-            return allUsers.stream()
-                    .filter(user -> user.getAttributes() != null &&
-                                  user.getAttributes().containsKey("tenant_id"))
-                    .toList();
+            // Get all users from Keycloak realm
+            // Note: For large user bases, consider implementing pagination
+            return realmResource.users().list();
         } catch (Exception e) {
             log.error("Failed to fetch users from Keycloak: {}", e.getMessage());
             return List.of();

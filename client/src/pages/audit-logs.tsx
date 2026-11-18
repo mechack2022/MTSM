@@ -8,6 +8,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/store'
 import ViewLogDetailsModal, { AuditLogEntry } from '@/components/modals/ViewLogDetailsModal'
+import { useAuditLogs, useAuditLogStatistics } from '@/hooks/use-audit-logs'
 
 export default function AuditLogsPage() {
   const navigate = useNavigate()
@@ -18,6 +19,17 @@ export default function AuditLogsPage() {
   const [filterCategory, setFilterCategory] = useState<'all' | 'staff' | 'policy' | 'operations' | 'financial' | 'security'>('all')
   const [selectedLog, setSelectedLog] = useState<AuditLogEntry | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [currentPage, setCurrentPage] = useState(0)
+
+  const { data: auditLogsData, isLoading: logsLoading } = useAuditLogs({
+    searchTerm: searchTerm || undefined,
+    severity: selectedSeverity !== 'all' ? selectedSeverity : undefined,
+    schoolId: selectedCampus !== 'all' ? selectedCampus : undefined,
+    page: currentPage,
+    size: 20,
+  })
+
+  const { data: statistics } = useAuditLogStatistics()
 
   const handleViewLog = (log: AuditLogEntry) => {
     setSelectedLog(log)
@@ -26,129 +38,12 @@ export default function AuditLogsPage() {
 
   const handleCloseModal = () => {
     setIsModalOpen(false)
-    setTimeout(() => setSelectedLog(null), 200) // Clear after animation
+    setTimeout(() => setSelectedLog(null), 200)
   }
 
-  // Dummy audit log data
-  const auditLogs: AuditLogEntry[] = [
-    {
-      id: '1',
-      timestamp: 'Today, 10:42 AM',
-      date: '24 Oct 2025',
-      userName: 'Dr. Aliyu Mohammed',
-      userRole: 'Lead Proprietor',
-      userInitials: 'AM',
-      avatarColor: 'bg-blue-600 text-white',
-      category: 'POLICY UPDATE',
-      categoryColor: 'bg-blue-100 text-blue-700',
-      eventTitle: 'Modified Academic Calendar',
-      eventDescription: 'Confirmed Term 2 resumption date set to 06 Jan 2026 across trust schools',
-      affectedEntity: 'All 3 Campuses',
-      entityIcon: 'apartment',
-      ipAddress: '102.89.44.12',
-      deviceInfo: 'Lagos, NG • Chrome (macOS)',
-      changeFrom: '12 Jan 2026',
-      changeTo: '06 Jan 2026',
-      changeReason: 'Accelerated resumption approved by Trust Board',
-      verification: '2FA Verified (WhatsApp OTP)',
-    },
-    {
-      id: '2',
-      timestamp: 'Today, 08:15 AM',
-      date: '24 Oct 2025',
-      userName: 'System Core Daemon',
-      userRole: 'Automated Process',
-      userInitials: '',
-      avatarColor: 'bg-gray-200 text-gray-600',
-      category: 'POLICY SYNC',
-      categoryColor: 'bg-teal-100 text-teal-700',
-      eventTitle: 'Propagated Inherited Grading Standards',
-      eventDescription: 'Applied statutory NERDC (A1-F9) schema with 40% CA to Ikeja & Abuja databases',
-      affectedEntity: 'Crown Jewel Prep, Ikeja',
-      entityIcon: 'school',
-      ipAddress: 'Internal Worker',
-      deviceInfo: 'GovCloud Enclave (Abuja DC)',
-    },
-    {
-      id: '3',
-      timestamp: 'Yesterday, 04:30 PM',
-      date: '23 Oct 2025',
-      userName: 'Dr. Aliyu Mohammed',
-      userRole: 'Lead Proprietor',
-      userInitials: 'AM',
-      avatarColor: 'bg-blue-600 text-white',
-      category: 'STAFF MANDATE',
-      categoryColor: 'bg-gray-200 text-blue-700',
-      eventTitle: 'Appointed Principal & Approval Authority',
-      eventDescription: 'Appointed Mrs. Folake Balogun as Principal (Lekki) with spend authorization of ₦1,500,000/mo',
-      affectedEntity: 'Lekki High School',
-      entityIcon: 'domain',
-      ipAddress: '102.89.44.12',
-      deviceInfo: 'Lagos, NG • Chrome (macOS)',
-    },
-    {
-      id: '4',
-      timestamp: '22 Oct 2025, 02:10 PM',
-      date: 'Wednesday',
-      userName: 'Dr. Aliyu Mohammed',
-      userRole: 'Lead Proprietor',
-      userInitials: 'AM',
-      avatarColor: 'bg-blue-600 text-white',
-      category: 'FINANCE POLICY',
-      categoryColor: 'bg-amber-100 text-amber-800',
-      eventTitle: 'Updated Tuition Settlement Bank Account',
-      eventDescription: 'Verified Zenith Bank PLC collection account (Acct: 1014892019) with Paystack gateway route',
-      affectedEntity: 'Trust Secretariat',
-      entityIcon: 'account_balance',
-      ipAddress: '102.89.44.12',
-      deviceInfo: 'Lagos, NG • Chrome (macOS)',
-    },
-    {
-      id: '5',
-      timestamp: '21 Oct 2025, 11:05 AM',
-      date: 'Tuesday',
-      userName: 'Mrs. Folake Balogun',
-      userRole: 'Principal (Lekki)',
-      userInitials: 'FB',
-      avatarColor: 'bg-teal-100 text-teal-700',
-      category: 'SECURITY AUTH',
-      categoryColor: 'bg-teal-100 text-teal-700',
-      eventTitle: 'Credential Activation & 2FA Bind',
-      eventDescription: 'Completed WhatsApp OTP two-factor authentication registration and hardware key linking',
-      affectedEntity: 'Lekki High School',
-      entityIcon: 'domain',
-      ipAddress: '105.112.38.90',
-      deviceInfo: 'Lagos, NG • Safari (iOS 18)',
-    },
-    {
-      id: '6',
-      timestamp: '19 Oct 2025, 09:20 AM',
-      date: 'Sunday',
-      userName: 'Dr. Aliyu Mohammed',
-      userRole: 'Lead Proprietor',
-      userInitials: 'AM',
-      avatarColor: 'bg-blue-600 text-white',
-      category: 'SCHOOL SETUP',
-      categoryColor: 'bg-gray-200 text-gray-600',
-      eventTitle: 'Dismissal Schedule Override',
-      eventDescription: 'Updated early pickup closing time window (01:30 PM) for Crèche & Nursery sections',
-      affectedEntity: 'Ikeja Prep',
-      entityIcon: 'child_care',
-      ipAddress: '102.89.44.12',
-      deviceInfo: 'Lagos, NG • Chrome (macOS)',
-    },
-  ]
-
-  // Filter logs
-  const filteredLogs = auditLogs.filter(log => {
-    const matchesSearch =
-      log.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.eventTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.eventDescription.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.ipAddress.toLowerCase().includes(searchTerm.toLowerCase())
-
-    return matchesSearch
-  })
+  const auditLogs = auditLogsData?.content || []
+  const totalElements = auditLogsData?.totalElements || 0
+  const totalPages = auditLogsData?.totalPages || 0
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -375,12 +270,12 @@ export default function AuditLogsPage() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-4xl font-bold text-gray-900 leading-tight tracking-tight">1,248</div>
+                  <div className="text-4xl font-bold text-gray-900 leading-tight tracking-tight">{statistics?.totalEvents.toLocaleString() || 0}</div>
                   <div className="flex items-center gap-1.5 mt-2 text-teal-700 text-xs font-medium">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                     </svg>
-                    <span className="font-semibold">+42 recorded this week</span>
+                    <span className="font-semibold">+{statistics?.eventsThisWeek || 0} recorded this week</span>
                   </div>
                 </div>
               </div>
@@ -396,7 +291,7 @@ export default function AuditLogsPage() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-4xl font-bold text-gray-900 leading-tight tracking-tight">312</div>
+                  <div className="text-4xl font-bold text-gray-900 leading-tight tracking-tight">{statistics?.securityEvents.toLocaleString() || 0}</div>
                   <div className="flex items-center gap-1.5 mt-2 text-teal-700 text-xs font-medium">
                     <span className="w-2 h-2 rounded-full bg-teal-500"></span>
                     <span className="font-semibold">0 unauthorized attempts</span>
@@ -415,7 +310,7 @@ export default function AuditLogsPage() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-4xl font-bold text-gray-900 leading-tight tracking-tight">18</div>
+                  <div className="text-4xl font-bold text-gray-900 leading-tight tracking-tight">{statistics?.policyEvents.toLocaleString() || 0}</div>
                   <div className="flex items-center gap-1.5 mt-2 text-gray-600 text-xs font-medium">
                     <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -436,7 +331,7 @@ export default function AuditLogsPage() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-4xl font-bold text-gray-900 leading-tight tracking-tight">64</div>
+                  <div className="text-4xl font-bold text-gray-900 leading-tight tracking-tight">{statistics?.staffEvents.toLocaleString() || 0}</div>
                   <div className="flex items-center gap-1.5 mt-2 text-gray-600 text-xs font-medium">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -586,63 +481,80 @@ export default function AuditLogsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 text-sm text-gray-900">
-                    {filteredLogs.map((log) => (
-                      <tr key={log.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="py-4 px-4 whitespace-nowrap">
-                          <span className="text-xs font-bold text-gray-900 block">{log.timestamp}</span>
-                          <span className="text-gray-600 text-xs block">{log.date}</span>
-                        </td>
-                        <td className="py-4 px-4 whitespace-nowrap">
-                          <div className="flex items-center gap-2.5">
-                            {log.userInitials ? (
-                              <div className={`w-8 h-8 rounded-full ${log.avatarColor} flex items-center justify-center text-xs font-bold`}>
-                                {log.userInitials}
-                              </div>
-                            ) : (
-                              <div className={`w-8 h-8 rounded-full ${log.avatarColor} flex items-center justify-center`}>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                </svg>
-                              </div>
-                            )}
-                            <div>
-                              <span className="text-xs font-bold text-gray-900 block leading-tight">{log.userName}</span>
-                              <span className="text-gray-600 text-[11px] block leading-tight">{log.userRole}</span>
-                            </div>
+                    {logsLoading ? (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center">
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                            <span className="text-sm text-gray-600">Loading audit logs...</span>
                           </div>
                         </td>
-                        <td className="py-4 px-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${log.categoryColor} text-[9px] font-bold`}>
-                            <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
-                            {log.category}
-                          </span>
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className="text-xs font-semibold text-gray-900 block">{log.eventTitle}</span>
-                          <span className="text-gray-600 text-xs block line-clamp-1">{log.eventDescription}</span>
-                        </td>
-                        <td className="py-4 px-4 whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-gray-100 text-gray-900 text-xs font-medium">
-                            <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                            </svg>
-                            {log.affectedEntity}
-                          </span>
-                        </td>
-                        <td className="py-4 px-4 whitespace-nowrap">
-                          <span className="font-mono text-xs text-gray-900 font-medium block">{log.ipAddress}</span>
-                          <span className="text-gray-600 text-[11px] block">{log.deviceInfo}</span>
-                        </td>
-                        <td className="py-4 px-4 text-right whitespace-nowrap">
-                          <button
-                            onClick={() => handleViewLog(log)}
-                            className="px-2.5 py-1 rounded-lg text-blue-600 hover:bg-blue-50 text-xs font-bold transition-colors"
-                          >
-                            View Log
-                          </button>
+                      </tr>
+                    ) : auditLogs.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center">
+                          <span className="text-sm text-gray-600">No audit logs found</span>
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      auditLogs.map((log) => (
+                        <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="py-4 px-4 whitespace-nowrap">
+                            <span className="text-xs font-bold text-gray-900 block">{log.timestamp}</span>
+                            <span className="text-gray-600 text-xs block">{log.date}</span>
+                          </td>
+                          <td className="py-4 px-4 whitespace-nowrap">
+                            <div className="flex items-center gap-2.5">
+                              {log.userInitials ? (
+                                <div className={`w-8 h-8 rounded-full ${log.avatarColor} flex items-center justify-center text-xs font-bold`}>
+                                  {log.userInitials}
+                                </div>
+                              ) : (
+                                <div className={`w-8 h-8 rounded-full ${log.avatarColor} flex items-center justify-center`}>
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                  </svg>
+                                </div>
+                              )}
+                              <div>
+                                <span className="text-xs font-bold text-gray-900 block leading-tight">{log.userName}</span>
+                                <span className="text-gray-600 text-[11px] block leading-tight">{log.userRole}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-4 px-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${log.categoryColor} text-[9px] font-bold`}>
+                              <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
+                              {log.categoryDisplayName}
+                            </span>
+                          </td>
+                          <td className="py-4 px-4">
+                            <span className="text-xs font-semibold text-gray-900 block">{log.eventTitle}</span>
+                            <span className="text-gray-600 text-xs block line-clamp-1">{log.eventDescription}</span>
+                          </td>
+                          <td className="py-4 px-4 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-gray-100 text-gray-900 text-xs font-medium">
+                              <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                              </svg>
+                              {log.affectedEntity || 'N/A'}
+                            </span>
+                          </td>
+                          <td className="py-4 px-4 whitespace-nowrap">
+                            <span className="font-mono text-xs text-gray-900 font-medium block">{log.ipAddress || 'N/A'}</span>
+                            <span className="text-gray-600 text-[11px] block">{log.deviceInfo || 'N/A'}</span>
+                          </td>
+                          <td className="py-4 px-4 text-right whitespace-nowrap">
+                            <button
+                              onClick={() => handleViewLog(log)}
+                              className="px-2.5 py-1 rounded-lg text-blue-600 hover:bg-blue-50 text-xs font-bold transition-colors"
+                            >
+                              View Log
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>

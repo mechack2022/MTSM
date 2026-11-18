@@ -4,6 +4,8 @@ import com.school.attendance.common.exception.DuplicateResourceException;
 import com.school.attendance.common.exception.ResourceNotFoundException;
 import com.school.attendance.common.util.PasswordGenerator;
 import com.school.attendance.common.util.PhoneNumberValidator;
+import com.school.attendance.email.entity.EmailVerification;
+import com.school.attendance.email.service.EmailVerificationService;
 import com.school.attendance.location.entity.LocalGovernment;
 import com.school.attendance.location.entity.State;
 import com.school.attendance.location.repository.LocalGovernmentRepository;
@@ -16,15 +18,21 @@ import com.school.attendance.school.enums.EducationalTier;
 import com.school.attendance.school.repository.SchoolRepository;
 import com.school.attendance.tenant.entity.Tenant;
 import com.school.attendance.tenant.repository.TenantRepository;
+import com.school.attendance.user.entity.User;
+import com.school.attendance.user.entity.UserRole;
+import com.school.attendance.user.repository.UserRepository;
+import com.school.attendance.user.repository.UserRoleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -39,6 +47,9 @@ public class SchoolService {
     private final LocalGovernmentRepository localGovernmentRepository;
     private final CampusCodeGenerator campusCodeGenerator;
     private final com.school.attendance.keycloak.KeycloakUserService keycloakUserService;
+    private final EmailVerificationService emailVerificationService;
+    private final UserRepository userRepository;
+    private final UserRoleRepository userRoleRepository;
 
     @Transactional
     public SchoolResponse createSchool(UUID tenantId, CreateSchoolRequest request) {
@@ -74,6 +85,16 @@ public class SchoolService {
             }
         }
 
+        // Validate school head email and phone
+        if (request.schoolHeadEmail() == null || request.schoolHeadEmail().isBlank()) {
+            throw new IllegalArgumentException("School head email is required");
+        }
+
+        // Check for duplicate email in User table
+        if (userRepository.existsByEmail(request.schoolHeadEmail())) {
+            throw new DuplicateResourceException("A user with this email already exists: " + request.schoolHeadEmail());
+        }
+
         // Validate and format phone number (if provided)
         String formattedPhone = null;
         if (request.schoolHeadPhone() != null && !request.schoolHeadPhone().isBlank()) {
@@ -81,6 +102,11 @@ public class SchoolService {
                 throw new IllegalArgumentException("Invalid Nigerian phone number. Expected format: 08012345678 or +2348012345678");
             }
             formattedPhone = PhoneNumberValidator.formatNigerianPhoneNumber(request.schoolHeadPhone());
+
+            // Check for duplicate phone in User table
+            if (userRepository.existsByPhone(formattedPhone)) {
+                throw new DuplicateResourceException("A user with this phone number already exists: " + formattedPhone);
+            }
         }
 
         // Determine educational tiers based on topology
@@ -97,6 +123,48 @@ public class SchoolService {
             log.info("{} topology selected - using user-selected tiers: {}", request.topology(), educationalTiers);
         }
 
+        // Generate temporary password and create Keycloak user
+        String tempPassword = PasswordGenerator.generatePassword();
+
+        // Use the provided first and last names with fallback defaults
+        String firstName = (request.schoolHeadFirstName() != null && !request.schoolHeadFirstName().isBlank())
+                ? request.schoolHeadFirstName() : "School";
+        String lastName = (request.schoolHeadLastName() != null && !request.schoolHeadLastName().isBlank())
+                ? request.schoolHeadLastName() : "Admin";
+
+        // Create the Keycloak user with school_admin role
+        // Note: We only set tenant_id here; school_id will be set after school is created
+        String keycloakUserId = keycloakUserService.createUser(
+                request.schoolHeadEmail(),
+                firstName,
+                lastName,
+                tempPassword,
+                "school_admin",
+                true // enabled
+        );
+
+        // Set tenant_id attribute (school_id will be set later after school creation)
+        keycloakUserService.setUserAttributes(keycloakUserId, Map.of(
+                "tenant_id", List.of(tenantId.toString())
+        ));
+
+        log.info("Created Keycloak school admin: {} for tenant: {}", keycloakUserId, tenantId);
+
+        // Create User record for the school head
+        User schoolHeadUser = User.builder()
+                .email(request.schoolHeadEmail())
+                .firstName(firstName)
+                .lastName(lastName)
+                .phone(formattedPhone)
+                .keycloakId(keycloakUserId)
+                .emailVerified(false)
+                .tenantId(tenantId)
+                .isPlatformAdmin(false)
+                .build();
+        User savedUser = userRepository.save(schoolHeadUser);
+        log.info("Created user record: {} ({})", savedUser.getEmail(), savedUser.getId());
+
+        // Create School referencing the user
         School school = School.builder()
                 .tenantId(tenantId)
                 .name(request.name())
@@ -106,9 +174,7 @@ public class SchoolService {
                 .state(state)
                 .localGovernment(localGovernment)
                 .physicalAddress(request.physicalAddress())
-                .schoolHeadName(buildFullName(request.schoolHeadFirstName(), request.schoolHeadLastName()))
-                .schoolHeadEmail(request.schoolHeadEmail())
-                .schoolHeadPhone(formattedPhone)
+                .schoolHeadUserId(savedUser.getId())  // Reference user by ID
                 .seatCapacity(request.seatCapacity())
                 .currentStudents(0)
                 .currentTeachers(0)
@@ -118,65 +184,60 @@ public class SchoolService {
         School savedSchool = schoolRepository.save(school);
         log.info("Created school: {} ({}) for tenant: {}", savedSchool.getName(), savedSchool.getCampusCode(), tenantId);
 
-        // Create a Keycloak user account for the school admin (school head)
-        if (request.schoolHeadEmail() != null && !request.schoolHeadEmail().isBlank()) {
-            try {
-                // Check if email is already in use in Keycloak
-                if (keycloakUserService.getUserByEmail(request.schoolHeadEmail()).isPresent()) {
-                    throw new DuplicateResourceException("A user with this email already exists: " + request.schoolHeadEmail());
-                }
+        // Update Keycloak user's school_id attribute now that school is created
+        keycloakUserService.setUserAttributes(keycloakUserId, Map.of(
+                "tenant_id", List.of(tenantId.toString()),
+                "school_id", List.of(savedSchool.getId().toString())
+        ));
+        log.info("Updated Keycloak user {} with school_id: {}", keycloakUserId, savedSchool.getId());
 
-                // Generate a temporary password for the school admin
-                String tempPassword = PasswordGenerator.generatePassword();
+        // Create UserRole assignment for SCHOOL_ADMIN
+        UserRole schoolAdminRole = UserRole.builder()
+                .userId(savedUser.getId())
+                .role("SCHOOL_ADMIN")
+                .tenantId(tenantId)
+                .schoolId(savedSchool.getId())
+                .isActive(true)
+                .assignedAt(LocalDateTime.now())
+                .assignedBy(savedUser.getId())  // Self-assigned during creation
+                .build();
+        userRoleRepository.save(schoolAdminRole);
+        log.info("Assigned SCHOOL_ADMIN role to user: {} for school: {}", savedUser.getEmail(), savedSchool.getCampusCode());
 
-                // Use the provided first and last names with fallback defaults
-                String firstName = (request.schoolHeadFirstName() != null && !request.schoolHeadFirstName().isBlank())
-                        ? request.schoolHeadFirstName() : "School";
-                String lastName = (request.schoolHeadLastName() != null && !request.schoolHeadLastName().isBlank())
-                        ? request.schoolHeadLastName() : "Admin";
+        // Send email verification to the school admin with metadata
+        String recipientName = firstName + " " + lastName;
+        Map<String, Object> metadata = Map.of(
+                "tenantId", tenantId.toString(),
+                "schoolId", savedSchool.getId().toString(),
+                "userId", savedUser.getId().toString(),
+                "keycloakUserId", keycloakUserId,
+                "recipientName", recipientName,
+                "tempPassword", tempPassword
+        );
 
-                // Create the Keycloak user with school_admin role and set tenant_id + school_id attributes
-                String userId = keycloakUserService.createUserWithTenantAndSchool(
-                        request.schoolHeadEmail(),
-                        firstName,
-                        lastName,
-                        tempPassword,
-                        "school_admin",
-                        tenantId,
-                        savedSchool.getId()
-                );
+        emailVerificationService.createVerificationAndSendEmail(
+                request.schoolHeadEmail(),
+                recipientName,
+                EmailVerification.VerificationType.SCHOOL_ADMIN,
+                metadata
+        );
 
-                // Send email verification to the school admin
-                keycloakUserService.sendVerificationEmail(userId);
+        log.info("Sent verification email to school admin: {}", request.schoolHeadEmail());
 
-                log.info("Created school admin user for school: {} - Email: {} (Name: {} {})",
-                        savedSchool.getName(), request.schoolHeadEmail(), firstName, lastName);
-            } catch (DuplicateResourceException e) {
-                // Re-throw validation errors to fail the school creation
-                throw e;
-            } catch (Exception e) {
-                log.error("Failed to create school admin user for school {}: {}", savedSchool.getName(), e.getMessage());
-                // Don't fail the entire school creation if user creation fails for other reasons
-                // The school is still created, but the admin user needs to be created manually
-            }
-        } else {
-            log.warn("No school head email provided for school: {}. School admin user not created.", savedSchool.getName());
-        }
-
-        return SchoolResponse.from(savedSchool);
+        return SchoolResponse.from(savedSchool, savedUser);
     }
 
     @Transactional(readOnly = true)
     public List<SchoolResponse> getAllSchoolsByTenant(UUID tenantId) {
         return schoolRepository.findAllByTenantId(tenantId).stream()
-                .map(SchoolResponse::from)
+                .map(this::toSchoolResponse)
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public List<SchoolResponse> getAllActiveSchoolsByTenant(UUID tenantId) {
         return schoolRepository.findAllActiveByTenantId(tenantId).stream()
-                .map(SchoolResponse::from)
+                .map(this::toSchoolResponse)
                 .toList();
     }
 
@@ -190,7 +251,7 @@ public class SchoolService {
             throw new ResourceNotFoundException("School not found with id: " + id);
         }
 
-        return SchoolResponse.from(school);
+        return toSchoolResponse(school);
     }
 
     @Transactional(readOnly = true)
@@ -203,7 +264,7 @@ public class SchoolService {
             throw new ResourceNotFoundException("School not found with campus code: " + campusCode);
         }
 
-        return SchoolResponse.from(school);
+        return toSchoolResponse(school);
     }
 
     @Transactional
@@ -258,16 +319,72 @@ public class SchoolService {
         }
 
         if (request.physicalAddress() != null) school.setPhysicalAddress(request.physicalAddress());
-        if (request.schoolHeadName() != null) school.setSchoolHeadName(request.schoolHeadName());
-        if (request.schoolHeadEmail() != null) school.setSchoolHeadEmail(request.schoolHeadEmail());
-        if (request.schoolHeadPhone() != null) school.setSchoolHeadPhone(request.schoolHeadPhone());
+
+        // Update school head user if email or name is being changed
+        // Note: School head can only be updated, not replaced with a different user
+        if (request.schoolHeadEmail() != null || request.schoolHeadName() != null || request.schoolHeadPhone() != null) {
+            // Fetch the school head user
+            User schoolHeadUser = userRepository.findById(school.getSchoolHeadUserId())
+                    .orElseThrow(() -> new ResourceNotFoundException("School head user not found for school: " + id));
+
+            boolean userUpdated = false;
+
+            if (request.schoolHeadEmail() != null) {
+                // Check for duplicate email before updating
+                if (!schoolHeadUser.getEmail().equals(request.schoolHeadEmail()) &&
+                    userRepository.existsByEmail(request.schoolHeadEmail())) {
+                    throw new DuplicateResourceException("A user with this email already exists: " + request.schoolHeadEmail());
+                }
+                schoolHeadUser.setEmail(request.schoolHeadEmail());
+                userUpdated = true;
+            }
+
+            if (request.schoolHeadName() != null) {
+                // Split the full name and update firstName/lastName
+                int lastSpaceIndex = request.schoolHeadName().lastIndexOf(' ');
+                if (lastSpaceIndex > 0) {
+                    schoolHeadUser.setFirstName(request.schoolHeadName().substring(0, lastSpaceIndex).trim());
+                    schoolHeadUser.setLastName(request.schoolHeadName().substring(lastSpaceIndex + 1).trim());
+                } else {
+                    schoolHeadUser.setFirstName(request.schoolHeadName().trim());
+                    schoolHeadUser.setLastName("");
+                }
+                userUpdated = true;
+            }
+
+            if (request.schoolHeadPhone() != null) {
+                // Validate phone format and check for duplicates
+                if (!request.schoolHeadPhone().isBlank()) {
+                    if (!PhoneNumberValidator.isValidNigerianPhoneNumber(request.schoolHeadPhone())) {
+                        throw new IllegalArgumentException("Invalid Nigerian phone number. Expected format: 08012345678 or +2348012345678");
+                    }
+                    String formattedPhoneUpdate = PhoneNumberValidator.formatNigerianPhoneNumber(request.schoolHeadPhone());
+
+                    // Check for duplicate phone if different from current
+                    if (!formattedPhoneUpdate.equals(schoolHeadUser.getPhone()) &&
+                        userRepository.existsByPhone(formattedPhoneUpdate)) {
+                        throw new DuplicateResourceException("A user with this phone number already exists: " + formattedPhoneUpdate);
+                    }
+                    schoolHeadUser.setPhone(formattedPhoneUpdate);
+                } else {
+                    schoolHeadUser.setPhone(null);
+                }
+                userUpdated = true;
+            }
+
+            if (userUpdated) {
+                userRepository.save(schoolHeadUser);
+                log.info("Updated school head user: {}", schoolHeadUser.getEmail());
+            }
+        }
+
         if (request.seatCapacity() != null) school.setSeatCapacity(request.seatCapacity());
         if (request.status() != null) school.setStatus(request.status());
 
         School updatedSchool = schoolRepository.save(school);
         log.info("Updated school: {} ({}) for tenant: {}", updatedSchool.getName(), updatedSchool.getCampusCode(), tenantId);
 
-        return SchoolResponse.from(updatedSchool);
+        return toSchoolResponse(updatedSchool);
     }
 
     @Transactional
@@ -289,7 +406,7 @@ public class SchoolService {
     @Transactional(readOnly = true)
     public List<SchoolResponse> searchSchools(UUID tenantId, String searchTerm) {
         return schoolRepository.searchByTenantIdAndNameOrCode(tenantId, searchTerm).stream()
-                .map(SchoolResponse::from)
+                .map(this::toSchoolResponse)
                 .toList();
     }
 
@@ -309,22 +426,11 @@ public class SchoolService {
     }
 
     /**
-     * Helper method to build a full name from first and last names.
-     * @param firstName The first name
-     * @param lastName The last name
-     * @return The full name, or null if both are empty
+     * Helper method to convert School entity to SchoolResponse DTO with User information
      */
-    private String buildFullName(String firstName, String lastName) {
-        boolean hasFirstName = firstName != null && !firstName.isBlank();
-        boolean hasLastName = lastName != null && !lastName.isBlank();
-
-        if (hasFirstName && hasLastName) {
-            return firstName.trim() + " " + lastName.trim();
-        } else if (hasFirstName) {
-            return firstName.trim();
-        } else if (hasLastName) {
-            return lastName.trim();
-        }
-        return null;
+    private SchoolResponse toSchoolResponse(School school) {
+        User schoolHeadUser = userRepository.findById(school.getSchoolHeadUserId())
+                .orElse(null);
+        return SchoolResponse.from(school, schoolHeadUser);
     }
 }

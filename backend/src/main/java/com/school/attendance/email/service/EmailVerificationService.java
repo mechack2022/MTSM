@@ -7,6 +7,8 @@ import com.school.attendance.common.exception.ResourceNotFoundException;
 import com.school.attendance.email.entity.EmailVerification;
 import com.school.attendance.email.repository.EmailVerificationRepository;
 import com.school.attendance.keycloak.KeycloakUserService;
+import com.school.attendance.user.entity.User;
+import com.school.attendance.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,6 +32,7 @@ public class EmailVerificationService {
     private final EmailVerificationRepository verificationRepository;
     private final EmailService emailService;
     private final KeycloakUserService keycloakUserService;
+    private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
 
     @Value("${app.mail.app-url:http://localhost:3000}")
@@ -100,9 +103,13 @@ public class EmailVerificationService {
         EmailVerification verification = verificationRepository.findByToken(token)
                 .orElseThrow(() -> new ResourceNotFoundException("Invalid verification token"));
 
-        // Check if already verified
+        // Check if already verified - return metadata instead of throwing exception
         if (verification.isVerified()) {
-            throw new BusinessException("This email has already been verified");
+            log.info("Email already verified: {} (type: {})", verification.getEmail(), verification.getVerificationType());
+            Map<String, Object> metadata = parseMetadata(verification.getMetadata());
+            metadata.put("alreadyVerified", true);
+            metadata.put("message", "This email has already been verified. You can proceed to login.");
+            return metadata;
         }
 
         // Check if expired
@@ -118,8 +125,24 @@ public class EmailVerificationService {
         // Parse metadata
         Map<String, Object> metadata = parseMetadata(verification.getMetadata());
 
-        // If this is a tenant admin verification, update Keycloak
-        if (verification.getVerificationType() == EmailVerification.VerificationType.TENANT_ADMIN) {
+        // Update User entity's emailVerified field
+        String userId = (String) metadata.get("userId");
+        if (userId != null) {
+            try {
+                User user = userRepository.findById(UUID.fromString(userId)).orElse(null);
+                if (user != null && !user.getEmailVerified()) {
+                    user.setEmailVerified(true);
+                    userRepository.save(user);
+                    log.info("Updated User emailVerified=true for userId: {}", userId);
+                }
+            } catch (Exception e) {
+                log.error("Failed to update User emailVerified status", e);
+            }
+        }
+
+        // If this is a tenant admin or school admin verification, update Keycloak
+        if (verification.getVerificationType() == EmailVerification.VerificationType.TENANT_ADMIN ||
+            verification.getVerificationType() == EmailVerification.VerificationType.SCHOOL_ADMIN) {
             String keycloakUserId = (String) metadata.get("keycloakUserId");
             if (keycloakUserId != null) {
                 try {
@@ -191,6 +214,38 @@ public class EmailVerificationService {
             log.error("Failed to parse metadata JSON", e);
             return Map.of();
         }
+    }
+
+    /**
+     * Get verification status and metadata (useful for retrieving temporary password after page close)
+     */
+    public Map<String, Object> getVerificationStatus(String email, EmailVerification.VerificationType verificationType) {
+        EmailVerification verification = verificationRepository
+                .findFirstByEmailAndVerificationTypeOrderByCreatedAtDesc(email, verificationType)
+                .orElseThrow(() -> new ResourceNotFoundException("No verification record found for this email"));
+
+        Map<String, Object> status = parseMetadata(verification.getMetadata());
+        status.put("verified", verification.isVerified());
+        status.put("expired", verification.isExpired());
+        status.put("email", verification.getEmail());
+        status.put("createdAt", verification.getCreatedAt());
+        status.put("verifiedAt", verification.getVerifiedAt());
+
+        // Only include temporary password if verified and within 7 days
+        if (verification.isVerified() && verification.getVerifiedAt() != null) {
+            Instant sevenDaysAgo = Instant.now().minus(7, ChronoUnit.DAYS);
+            if (verification.getVerifiedAt().isAfter(sevenDaysAgo)) {
+                // Password is still accessible within 7 days of verification
+                log.info("Providing credentials for recently verified email: {}", email);
+            } else {
+                // Remove password from metadata if more than 7 days old for security
+                status.remove("tempPassword");
+                status.put("passwordExpired", true);
+                status.put("message", "Temporary password expired. Please use 'Forgot Password' to reset.");
+            }
+        }
+
+        return status;
     }
 
     /**

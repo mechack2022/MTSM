@@ -68,6 +68,7 @@ public class EmailVerification {
 
     public enum VerificationType {
         TENANT_ADMIN,
+        SCHOOL_ADMIN,
         USER_SIGNUP,
         EMAIL_CHANGE,
         PASSWORD_RESET,

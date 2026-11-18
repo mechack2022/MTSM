@@ -27,6 +27,14 @@ public interface EmailVerificationRepository extends JpaRepository<EmailVerifica
     );
 
     /**
+     * Find the latest verification (verified or not) for an email and type
+     */
+    Optional<EmailVerification> findFirstByEmailAndVerificationTypeOrderByCreatedAtDesc(
+            String email,
+            EmailVerification.VerificationType verificationType
+    );
+
+    /**
      * Check if email has a verified token of specific type
      */
     boolean existsByEmailAndVerificationTypeAndVerifiedTrue(

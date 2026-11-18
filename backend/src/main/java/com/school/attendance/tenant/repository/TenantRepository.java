@@ -18,14 +18,8 @@ public interface TenantRepository extends JpaRepository<Tenant, UUID> {
     @Query("SELECT COUNT(t) > 0 FROM Tenant t WHERE t.code = :code AND t.deletedAt IS NULL")
     boolean existsByCode(String code);
 
-    @Query("SELECT COUNT(t) > 0 FROM Tenant t WHERE t.contactEmail = :contactEmail AND t.deletedAt IS NULL")
-    boolean existsByContactEmail(String contactEmail);
-
     @Query("SELECT COUNT(t) > 0 FROM Tenant t WHERE t.cacNumber = :cacNumber AND t.deletedAt IS NULL")
     boolean existsByCacNumber(String cacNumber);
-
-    @Query("SELECT COUNT(t) > 0 FROM Tenant t WHERE t.contactPhone = :contactPhone AND t.deletedAt IS NULL")
-    boolean existsByContactPhone(String contactPhone);
 
     @Query("SELECT COUNT(t) > 0 FROM Tenant t WHERE t.subdomain = :subdomain AND t.deletedAt IS NULL")
     boolean existsBySubdomain(String subdomain);
@@ -45,7 +39,4 @@ public interface TenantRepository extends JpaRepository<Tenant, UUID> {
     @Query("SELECT t FROM Tenant t WHERE (LOWER(t.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
            "OR LOWER(t.code) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) AND t.deletedAt IS NULL ORDER BY t.name")
     List<Tenant> searchByNameOrCode(String searchTerm);
-
-    @Query("SELECT t.contactEmail FROM Tenant t WHERE t.deletedAt IS NULL")
-    List<String> findAllContactEmails();
 }

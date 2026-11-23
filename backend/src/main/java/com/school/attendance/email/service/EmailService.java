@@ -95,6 +95,16 @@ public class EmailService {
     }
 
     /**
+     * Send staff invitation email
+     */
+    @Async
+    public void sendStaffInvitationEmail(String to, String recipientName, String schoolName, String staffNumber, String setupAccountUrl) {
+        String subject = String.format("Staff Invitation - %s", appName);
+        String htmlBody = buildStaffInvitationEmailHtml(recipientName, schoolName, staffNumber, setupAccountUrl);
+        sendHtmlEmail(to, subject, htmlBody);
+    }
+
+    /**
      * Build HTML for verification email
      */
     private String buildVerificationEmailHtml(String recipientName, String verificationLink) {
@@ -200,5 +210,64 @@ public class EmailService {
                 </body>
                 </html>
                 """.formatted(appName, recipientName, tempPassword, loginUrl, appName);
+    }
+
+    /**
+     * Build HTML for staff invitation email
+     */
+    private String buildStaffInvitationEmailHtml(String recipientName, String schoolName, String staffNumber, String setupAccountUrl) {
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <style>
+                        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                        .header { background-color: #4F46E5; color: white; padding: 20px; text-align: center; }
+                        .content { background-color: #f9f9f9; padding: 30px; }
+                        .info-box { background-color: #fff; padding: 15px; border-left: 4px solid #4F46E5; margin: 20px 0; }
+                        .button {
+                            display: inline-block;
+                            padding: 12px 30px;
+                            background-color: #4F46E5;
+                            color: white;
+                            text-decoration: none;
+                            border-radius: 5px;
+                            margin: 20px 0;
+                        }
+                        .footer { text-align: center; padding: 20px; font-size: 12px; color: #666; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <h1>Welcome to %s!</h1>
+                        </div>
+                        <div class="content">
+                            <h2>Hi %s,</h2>
+                            <p>You have been added as a staff member at <strong>%s</strong>.</p>
+                            <div class="info-box">
+                                <h3>Your Staff Information:</h3>
+                                <p><strong>Staff Number:</strong> %s</p>
+                                <p><strong>Email:</strong> This email address</p>
+                            </div>
+                            <p>To complete your registration and set up your account, please click the button below:</p>
+                            <div style="text-align: center;">
+                                <a href="%s" class="button">Set Up Your Account</a>
+                            </div>
+                            <p>Or copy and paste this link into your browser:</p>
+                            <p style="word-break: break-all; color: #4F46E5;">%s</p>
+                            <p><strong>This link will expire in 7 days.</strong></p>
+                            <p>If you have any questions, please contact your school administrator.</p>
+                        </div>
+                        <div class="footer">
+                            <p>&copy; 2024 %s. All rights reserved.</p>
+                        </div>
+                    </div>
+                </body>
+                </html>
+                """.formatted(appName, recipientName, schoolName, staffNumber, setupAccountUrl, setupAccountUrl, appName);
     }
 }

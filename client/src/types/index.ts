@@ -492,3 +492,5 @@ export interface AttendanceFormData {
     notes?: string
   }>
 }
+
+export * from './staff'

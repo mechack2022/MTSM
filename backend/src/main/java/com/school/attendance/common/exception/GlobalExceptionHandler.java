@@ -76,6 +76,29 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleHttpMessageNotReadable(
+            org.springframework.http.converter.HttpMessageNotReadableException ex,
+            HttpServletRequest request) {
+        log.error("Failed to read HTTP message: {}", ex.getMessage(), ex);
+
+        String message = "Invalid request data";
+        if (ex.getCause() instanceof com.fasterxml.jackson.databind.exc.InvalidFormatException) {
+            com.fasterxml.jackson.databind.exc.InvalidFormatException ife =
+                (com.fasterxml.jackson.databind.exc.InvalidFormatException) ex.getCause();
+            message = String.format("Invalid value '%s' for field '%s'",
+                ife.getValue(),
+                ife.getPath().get(0).getFieldName());
+        }
+
+        var error = new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                message,
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(
             Exception ex,

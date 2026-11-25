@@ -176,12 +176,14 @@ export default function SchoolAdminStaffDirectoryPage() {
   // Fetch real staff data
   const { data: realStaffData, isLoading } = useStaff()
 
-  // Transform real data or use mock as fallback
+  // Transform real data - if data has loaded, use it even if empty
   const ALL_STAFF = useMemo(() => {
-    if (realStaffData && realStaffData.length > 0) {
+    // If data is defined (even if empty array), use real data
+    if (realStaffData !== undefined) {
       return realStaffData.map(mapStaffToUIFormat)
     }
-    return MOCK_STAFF
+    // Only use mock data if loading or data hasn't loaded yet
+    return []
   }, [realStaffData])
 
   // Filter staff based on selected scope
@@ -429,65 +431,88 @@ export default function SchoolAdminStaffDirectoryPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200 bg-white">
-                        {filteredStaff.map((staff) => (
-                          <tr key={staff.id} className="hover:bg-gray-50 transition-colors">
-                            <td className="px-4 py-4">
-                              <div className="flex items-center gap-3">
-                                <img
-                                  src={staff.avatar}
-                                  alt={staff.name}
-                                  className="w-10 h-10 rounded-full object-cover"
-                                />
-                                <div>
-                                  <p className="font-semibold text-[var(--md-sys-color-on-surface,#1a1c1e)]">{staff.name}</p>
-                                  <p className="text-xs text-gray-500">{staff.staffNumber || staff.id}</p>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-4">
-                              <p className="text-sm font-medium text-gray-900">{staff.role}</p>
-                              <p className="text-xs text-gray-500">{staff.department}</p>
-                            </td>
-                            <td className="px-4 py-4">
-                              <p className="text-sm font-medium text-gray-900">{staff.trcn}</p>
-                              <p className="text-xs text-green-600 font-semibold">
-                                {staff.trcn.startsWith('TRCN') ? 'MoE Verified' : staff.trcn.startsWith('ICAN') ? 'Professional' : 'Licensed RN'}
-                              </p>
-                            </td>
-                            <td className="px-4 py-4">
-                              <p className="text-sm text-gray-900">{staff.phone}</p>
-                              <p className="text-xs text-gray-500">{staff.email}</p>
-                            </td>
-                            <td className="px-4 py-4">
-                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
-                                staff.status === 'Active'
-                                  ? 'bg-green-50 text-green-700'
-                                  : 'bg-amber-50 text-amber-700'
-                              }`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${
-                                  staff.status === 'Active' ? 'bg-green-600' : 'bg-amber-600'
-                                }`}></span>
-                                {staff.status}
-                              </span>
-                            </td>
-                            <td className="px-4 py-4 text-right">
-                              <div className="flex items-center justify-end gap-3">
+                        {filteredStaff.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="px-4 py-16 text-center">
+                              <div className="flex flex-col items-center justify-center">
+                                <svg className="w-16 h-16 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                                <h3 className="text-lg font-semibold text-gray-900 mb-1">No Staff Members Found</h3>
+                                <p className="text-sm text-gray-600 mb-4">Get started by adding your first staff member</p>
                                 <button
-                                  onClick={() => navigate(`/edit-staff/${staff.id}`)}
-                                  className="p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-all"
-                                  title="Edit staff details"
+                                  onClick={() => navigate('/add-staff')}
+                                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[var(--md-sys-color-primary,#1976d2)] hover:bg-blue-700 text-white font-semibold text-sm transition-all shadow-md hover:shadow-lg"
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                                   </svg>
-                                </button>
-                                <button className="text-[var(--md-sys-color-primary,#1976d2)] hover:underline text-sm font-semibold">
-                                  View
+                                  Add New Staff
                                 </button>
                               </div>
                             </td>
                           </tr>
-                        ))}
+                        ) : (
+                          filteredStaff.map((staff) => (
+                            <tr key={staff.id} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-4 py-4">
+                                <div className="flex items-center gap-3">
+                                  <img
+                                    src={staff.avatar}
+                                    alt={staff.name}
+                                    className="w-10 h-10 rounded-full object-cover"
+                                  />
+                                  <div>
+                                    <p className="font-semibold text-[var(--md-sys-color-on-surface,#1a1c1e)]">{staff.name}</p>
+                                    <p className="text-xs text-gray-500">{staff.staffNumber || staff.id}</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-4 py-4">
+                                <p className="text-sm font-medium text-gray-900">{staff.role}</p>
+                                <p className="text-xs text-gray-500">{staff.department}</p>
+                              </td>
+                              <td className="px-4 py-4">
+                                <p className="text-sm font-medium text-gray-900">{staff.trcn}</p>
+                                <p className="text-xs text-green-600 font-semibold">
+                                  {staff.trcn.startsWith('TRCN') ? 'MoE Verified' : staff.trcn.startsWith('ICAN') ? 'Professional' : 'Licensed RN'}
+                                </p>
+                              </td>
+                              <td className="px-4 py-4">
+                                <p className="text-sm text-gray-900">{staff.phone}</p>
+                                <p className="text-xs text-gray-500">{staff.email}</p>
+                              </td>
+                              <td className="px-4 py-4">
+                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                  staff.status === 'Active'
+                                    ? 'bg-green-50 text-green-700'
+                                    : 'bg-amber-50 text-amber-700'
+                                }`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${
+                                    staff.status === 'Active' ? 'bg-green-600' : 'bg-amber-600'
+                                  }`}></span>
+                                  {staff.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-4 text-right">
+                                <div className="flex items-center justify-end gap-3">
+                                  <button
+                                    onClick={() => navigate(`/edit-staff/${staff.id}`)}
+                                    className="p-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-all"
+                                    title="Edit staff details"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                  </button>
+                                  <button className="text-[var(--md-sys-color-primary,#1976d2)] hover:underline text-sm font-semibold">
+                                    View
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>

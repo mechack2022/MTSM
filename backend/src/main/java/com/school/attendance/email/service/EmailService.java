@@ -94,13 +94,11 @@ public class EmailService {
         sendHtmlEmail(to, subject, htmlBody);
     }
 
-    /**
-     * Send staff invitation email
-     */
     @Async
-    public void sendStaffInvitationEmail(String to, String recipientName, String schoolName, String staffNumber, String setupAccountUrl) {
+    public void sendStaffInvitationEmail(String to, String recipientName, String schoolName,
+                                         String staffNumber, String tempPassword, String loginUrl) {
         String subject = String.format("Staff Invitation - %s", appName);
-        String htmlBody = buildStaffInvitationEmailHtml(recipientName, schoolName, staffNumber, setupAccountUrl);
+        String htmlBody = buildStaffInvitationEmailHtml(to, recipientName, schoolName, staffNumber, tempPassword, loginUrl);
         sendHtmlEmail(to, subject, htmlBody);
     }
 
@@ -212,10 +210,8 @@ public class EmailService {
                 """.formatted(appName, recipientName, tempPassword, loginUrl, appName);
     }
 
-    /**
-     * Build HTML for staff invitation email
-     */
-    private String buildStaffInvitationEmailHtml(String recipientName, String schoolName, String staffNumber, String setupAccountUrl) {
+    private String buildStaffInvitationEmailHtml(String emailAddress, String recipientName, String schoolName,
+                                                  String staffNumber, String tempPassword, String loginUrl) {
         return """
                 <!DOCTYPE html>
                 <html>
@@ -228,6 +224,7 @@ public class EmailService {
                         .header { background-color: #4F46E5; color: white; padding: 20px; text-align: center; }
                         .content { background-color: #f9f9f9; padding: 30px; }
                         .info-box { background-color: #fff; padding: 15px; border-left: 4px solid #4F46E5; margin: 20px 0; }
+                        .credentials { background-color: #fff; padding: 15px; border-left: 4px solid #10B981; margin: 20px 0; }
                         .button {
                             display: inline-block;
                             padding: 12px 30px;
@@ -251,15 +248,17 @@ public class EmailService {
                             <div class="info-box">
                                 <h3>Your Staff Information:</h3>
                                 <p><strong>Staff Number:</strong> %s</p>
-                                <p><strong>Email:</strong> This email address</p>
+                                <p><strong>Email:</strong> %s</p>
                             </div>
-                            <p>To complete your registration and set up your account, please click the button below:</p>
+                            <div class="credentials">
+                                <h3>Your Login Credentials:</h3>
+                                <p><strong>Email:</strong> %s</p>
+                                <p><strong>Temporary Password:</strong> <code>%s</code></p>
+                                <p style="color: #DC2626; font-size: 14px;">⚠️ You must change this password on first login.</p>
+                            </div>
                             <div style="text-align: center;">
-                                <a href="%s" class="button">Set Up Your Account</a>
+                                <a href="%s" class="button">Login to Your Account</a>
                             </div>
-                            <p>Or copy and paste this link into your browser:</p>
-                            <p style="word-break: break-all; color: #4F46E5;">%s</p>
-                            <p><strong>This link will expire in 7 days.</strong></p>
                             <p>If you have any questions, please contact your school administrator.</p>
                         </div>
                         <div class="footer">
@@ -268,6 +267,6 @@ public class EmailService {
                     </div>
                 </body>
                 </html>
-                """.formatted(appName, recipientName, schoolName, staffNumber, setupAccountUrl, setupAccountUrl, appName);
+                """.formatted(appName, recipientName, schoolName, staffNumber, emailAddress, emailAddress, tempPassword, loginUrl, appName);
     }
 }

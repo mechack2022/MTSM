@@ -118,6 +118,15 @@ export function KeycloakProvider({ children }: KeycloakProviderProps) {
             }
           }
 
+          if (['TEACHER', 'SUBJECT_TEACHER', 'CLASS_TEACHER', 'HEAD_TEACHER'].includes(role)) {
+            try {
+              await api.post('/staff/activate-account')
+              console.log('Staff account activation triggered for first login')
+            } catch (error) {
+              console.log('Staff account activation call (might already be activated):', error)
+            }
+          }
+
           console.log('User authenticated via SSO:', user)
         }
       })

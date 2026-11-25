@@ -213,4 +213,32 @@ public class StaffController {
         long count = staffService.countActiveStaffBySchool(UUID.fromString(schoolId));
         return ResponseEntity.ok(count);
     }
+
+    @PostMapping("/activate-account")
+    @PreAuthorize("hasAnyRole('SCHOOL_ADMIN', 'PRINCIPAL', 'HEAD_TEACHER', 'TEACHER', 'STAFF', 'SUBJECT_TEACHER', 'CLASS_TEACHER')")
+    public ResponseEntity<StaffResponse> activateAccount(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal Jwt jwt) {
+        log.info("Staff activation request - JWT claims: {}", jwt.getClaims());
+
+        String userId = jwt.getClaimAsString("user_id");
+        if (userId == null) {
+            userId = jwt.getSubject();
+        }
+
+        log.info("Activating staff account for userId: {}", userId);
+
+        if (userId == null) {
+            log.error("No user_id or sub claim found in JWT");
+            return ResponseEntity.badRequest().build();
+        }
+
+        try {
+            StaffResponse staff = staffService.activateStaffAccount(UUID.fromString(userId));
+            log.info("Successfully activated staff account: {}", staff.getEmail());
+            return ResponseEntity.ok(staff);
+        } catch (Exception e) {
+            log.error("Failed to activate staff account for userId {}: {}", userId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 }

@@ -3,6 +3,7 @@ package com.school.attendance.user.dto;
 import com.school.attendance.common.validation.AgeRange;
 import com.school.attendance.user.entity.Department;
 import com.school.attendance.user.entity.HighestQualification;
+import com.school.attendance.user.entity.NextOfKin;
 import com.school.attendance.user.entity.SchoolSection;
 import com.school.attendance.user.entity.StaffRole;
 import jakarta.validation.constraints.*;
@@ -47,6 +48,8 @@ public class CreateStaffRequest {
 
     @Pattern(regexp = "^(MALE|FEMALE|OTHER)$", message = "Gender must be MALE, FEMALE, or OTHER")
     private String gender;
+
+    private NextOfKin nextOfKin;
 
     @NotBlank(message = "Employment type is required")
     @Pattern(regexp = "^(FULL_TIME|PART_TIME|CONTRACT|TEMPORARY)$",

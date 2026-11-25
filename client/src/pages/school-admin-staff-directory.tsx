@@ -11,12 +11,40 @@
 // - Compliance footer
 // ============================================================================
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader, Sidebar } from '@/components/layout'
+import { useStaff } from '@/hooks/use-staff'
+import type { Staff } from '@/types'
 
-// Staff members data with section assignments
-const ALL_STAFF = [
+const getSectionFromSchoolSection = (schoolSection: string): string[] => {
+  const sectionMap: Record<string, string> = {
+    'EARLY_YEARS': 'Early Years',
+    'PRIMARY': 'Primary Basic',
+    'JUNIOR_SECONDARY': 'Junior Secondary',
+    'SENIOR_SECONDARY': 'Senior Secondary',
+  }
+  return [sectionMap[schoolSection] || 'Whole School', 'Whole School']
+}
+
+const mapStaffToUIFormat = (staff: Staff) => ({
+  id: staff.staffNumber,
+  name: staff.fullName,
+  role: staff.primaryRoleDisplay,
+  department: staff.department ? staff.department.replace(/_/g, ' ') : 'General',
+  trcn: staff.trcnLicenseNumber || 'N/A',
+  email: staff.email,
+  phone: staff.phone || 'N/A',
+  status: staff.employmentStatus === 'ACTIVE' ? 'Active' :
+          staff.employmentStatus === 'ON_LEAVE' ? 'On Leave' :
+          staff.employmentStatus === 'SUSPENDED' ? 'Suspended' :
+          staff.employmentStatus === 'TERMINATED' ? 'Terminated' : 'Inactive',
+  avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(staff.fullName)}&background=1976d2&color=fff&size=128`,
+  sections: getSectionFromSchoolSection(staff.schoolSection),
+})
+
+// Fallback mock data
+const MOCK_STAFF = [
   {
     id: 'EMP-2024-089',
     name: 'Engr. Yusuf Bello',
@@ -143,6 +171,17 @@ export default function SchoolAdminStaffDirectoryPage() {
   const navigate = useNavigate()
   const [selectedScope, setSelectedScope] = useState('Whole School')
   const [selectedStatus, setSelectedStatus] = useState('All')
+
+  // Fetch real staff data
+  const { data: realStaffData, isLoading } = useStaff()
+
+  // Transform real data or use mock as fallback
+  const ALL_STAFF = useMemo(() => {
+    if (realStaffData && realStaffData.length > 0) {
+      return realStaffData.map(mapStaffToUIFormat)
+    }
+    return MOCK_STAFF
+  }, [realStaffData])
 
   // Filter staff based on selected scope
   const filteredStaff = ALL_STAFF.filter((staff) => {

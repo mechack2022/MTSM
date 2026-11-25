@@ -172,3 +172,24 @@ export function useDeleteStaff() {
     },
   })
 }
+
+export function useActivateStaffAccount() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async () => {
+      const response = await api.post<Staff>('/staff/activate-account')
+      return response.data!
+    },
+
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['staff'] })
+      queryClient.invalidateQueries({ queryKey: ['staff', data.id] })
+      console.log('Staff account activated successfully', data)
+    },
+
+    onError: (error: any) => {
+      console.error('Failed to activate staff account:', error)
+    },
+  })
+}

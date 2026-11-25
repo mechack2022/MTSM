@@ -2,7 +2,9 @@ package com.school.attendance.user.service;
 
 import com.school.attendance.common.exception.DuplicateResourceException;
 import com.school.attendance.common.exception.ResourceNotFoundException;
+import com.school.attendance.common.util.PasswordGenerator;
 import com.school.attendance.email.service.EmailService;
+import com.school.attendance.keycloak.KeycloakUserService;
 import com.school.attendance.school.entity.School;
 import com.school.attendance.school.repository.SchoolRepository;
 import com.school.attendance.user.dto.CreateStaffRequest;
@@ -11,7 +13,10 @@ import com.school.attendance.user.dto.UpdateStaffRequest;
 import com.school.attendance.user.entity.SchoolSection;
 import com.school.attendance.user.entity.Staff;
 import com.school.attendance.user.entity.StaffRole;
+import com.school.attendance.user.entity.User;
 import com.school.attendance.user.repository.StaffRepository;
+import com.school.attendance.user.repository.UserRepository;
+import com.school.attendance.user.util.StaffRoleMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,8 +33,10 @@ import java.util.UUID;
 public class StaffService {
 
     private final StaffRepository staffRepository;
+    private final UserRepository userRepository;
     private final SchoolRepository schoolRepository;
     private final EmailService emailService;
+    private final KeycloakUserService keycloakUserService;
 
     @Value("${app.mail.app-url:http://localhost:3000}")
     private String appUrl;
@@ -68,6 +75,7 @@ public class StaffService {
                 .trcnVerified(false)
                 .dateOfBirth(request.getDateOfBirth())
                 .gender(request.getGender())
+                .nextOfKin(request.getNextOfKin())
                 .employmentType(request.getEmploymentType())
                 .employmentStatus(request.getEmploymentStatus())
                 .accountProvisioned(false)
@@ -77,8 +85,46 @@ public class StaffService {
         Staff savedStaff = staffRepository.save(staff);
         log.info("Created staff: {} - {} {}", savedStaff.getStaffNumber(), savedStaff.getFirstName(), savedStaff.getLastName());
 
+        String tempPassword = null;
+        try {
+            tempPassword = PasswordGenerator.generatePassword();
+            String keycloakRole = StaffRoleMapper.toKeycloakRole(request.getPrimaryRole());
+
+            String keycloakUserId = keycloakUserService.createUserWithTenantAndSchool(
+                    request.getEmail(),
+                    request.getFirstName(),
+                    request.getLastName(),
+                    tempPassword,
+                    keycloakRole,
+                    tenantId,
+                    schoolId
+            );
+
+            savedStaff.setUserId(UUID.fromString(keycloakUserId));
+            savedStaff.setAccountProvisioned(true);
+            savedStaff = staffRepository.save(savedStaff);
+
+            User user = User.builder()
+                    .email(request.getEmail())
+                    .firstName(request.getFirstName())
+                    .lastName(request.getLastName())
+                    .phone(request.getPhone())
+                    .keycloakId(keycloakUserId)
+                    .emailVerified(false)
+                    .tenantId(tenantId)
+                    .isPlatformAdmin(false)
+                    .createdBy(createdBy)
+                    .build();
+            userRepository.save(user);
+
+            log.info("Created Keycloak user and User record for staff: {} with role: {}", savedStaff.getEmail(), keycloakRole);
+        } catch (Exception e) {
+            log.error("Failed to create Keycloak user for staff: {} - {}", request.getEmail(), e.getMessage(), e);
+            throw new RuntimeException("Failed to provision staff account in Keycloak", e);
+        }
+
         if (Boolean.TRUE.equals(request.getSendInvitationEmail())) {
-            sendStaffInvitation(savedStaff);
+            sendStaffInvitation(savedStaff, tempPassword);
         }
 
         return toStaffResponse(savedStaff);
@@ -182,7 +228,16 @@ public class StaffService {
         if (request.getGender() != null) staff.setGender(request.getGender());
         if (request.getNextOfKin() != null) staff.setNextOfKin(request.getNextOfKin());
         if (request.getEmploymentType() != null) staff.setEmploymentType(request.getEmploymentType());
-        if (request.getEmploymentStatus() != null) staff.setEmploymentStatus(request.getEmploymentStatus());
+
+        if (request.getEmploymentStatus() != null) {
+            String oldStatus = staff.getEmploymentStatus();
+            String newStatus = request.getEmploymentStatus();
+
+            if (staff.getUserId() != null && !newStatus.equals(oldStatus)) {
+                syncKeycloakAccountStatus(staff.getUserId(), newStatus);
+            }
+            staff.setEmploymentStatus(newStatus);
+        }
 
         staff.setUpdatedBy(updatedBy);
 
@@ -199,6 +254,21 @@ public class StaffService {
 
         if (!staff.getSchoolId().equals(schoolId)) {
             throw new ResourceNotFoundException("Staff not found with id: " + id);
+        }
+
+        if (staff.getUserId() != null) {
+            try {
+                keycloakUserService.disableUser(staff.getUserId().toString());
+                log.info("Disabled Keycloak account for deleted staff: {}", staff.getEmail());
+            } catch (Exception e) {
+                log.error("Failed to disable Keycloak account for staff: {} - {}", staff.getEmail(), e.getMessage());
+            }
+
+            userRepository.findByKeycloakId(staff.getUserId().toString()).ifPresent(user -> {
+                user.softDelete(deletedBy);
+                userRepository.save(user);
+                log.info("Soft deleted User record for staff: {}", staff.getEmail());
+            });
         }
 
         staff.softDelete(deletedBy);
@@ -228,6 +298,59 @@ public class StaffService {
         return StaffRole.getRolesForTier(section.getTierName());
     }
 
+    @Transactional
+    public StaffResponse activateStaffAccount(UUID userId) {
+        Staff staff = staffRepository.findByUserIdAndDeletedAtIsNull(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Staff not found for user: " + userId));
+
+        if (staff.getAccountActivatedAt() != null) {
+            log.info("Staff account already activated: {}", staff.getEmail());
+            return toStaffResponse(staff);
+        }
+
+        staff.setAccountActivatedAt(LocalDateTime.now());
+        if (staff.getInvitationAcceptedAt() == null) {
+            staff.setInvitationAcceptedAt(LocalDateTime.now());
+        }
+        if (staff.getDateOfEmployment() == null) {
+            staff.setDateOfEmployment(LocalDateTime.now().toLocalDate());
+        }
+
+        Staff updatedStaff = staffRepository.save(staff);
+
+        userRepository.findByKeycloakId(userId.toString()).ifPresent(user -> {
+            user.setEmailVerified(true);
+            userRepository.save(user);
+            log.info("Set emailVerified=true for user: {}", user.getEmail());
+        });
+
+        log.info("Activated staff account: {} - {} {}",
+                updatedStaff.getStaffNumber(), updatedStaff.getFirstName(), updatedStaff.getLastName());
+
+        return toStaffResponse(updatedStaff);
+    }
+
+    private void syncKeycloakAccountStatus(UUID userId, String employmentStatus) {
+        try {
+            String keycloakUserId = userId.toString();
+
+            switch (employmentStatus) {
+                case "ACTIVE", "ON_LEAVE" -> {
+                    keycloakUserService.enableUser(keycloakUserId);
+                    log.info("Enabled Keycloak account for staff with status: {}", employmentStatus);
+                }
+                case "INACTIVE", "SUSPENDED", "TERMINATED" -> {
+                    keycloakUserService.disableUser(keycloakUserId);
+                    log.info("Disabled Keycloak account for staff with status: {}", employmentStatus);
+                }
+                default -> log.warn("Unknown employment status: {}", employmentStatus);
+            }
+        } catch (Exception e) {
+            log.error("Failed to sync Keycloak account status: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to sync staff account status with Keycloak", e);
+        }
+    }
+
     private String generateStaffNumber(UUID schoolId, SchoolSection section) {
         long count = staffRepository.countBySchoolId(schoolId);
         String sectionCode = section.getCode();
@@ -235,34 +358,33 @@ public class StaffService {
         return String.format("%s-%s-%05d", schoolCode, sectionCode, count + 1);
     }
 
-    private void sendStaffInvitation(Staff staff) {
+    private void sendStaffInvitation(Staff staff, String tempPassword) {
         try {
-            // Fetch school name
             School school = schoolRepository.findById(staff.getSchoolId())
                     .orElseThrow(() -> new ResourceNotFoundException("School not found with id: " + staff.getSchoolId()));
 
-            // Build setup account URL (this would typically include a token for secure setup)
-            String setupAccountUrl = String.format("%s/staff/setup-account?email=%s&staffId=%s",
-                    appUrl, staff.getEmail(), staff.getId());
+            String loginUrl = String.format("%s/login", appUrl);
 
-            // Send invitation email
+            log.info("Attempting to send invitation email to: {} with password: {}", staff.getEmail(), tempPassword);
+
             emailService.sendStaffInvitationEmail(
                     staff.getEmail(),
                     staff.getFullName(),
                     school.getName(),
                     staff.getStaffNumber(),
-                    setupAccountUrl
+                    tempPassword,
+                    loginUrl
             );
 
-            // Update invitation timestamp
             staff.setInvitationSentAt(LocalDateTime.now());
             staffRepository.save(staff);
 
-            log.info("Invitation email sent to staff: {} ({}) at {}",
+            log.info("SUCCESS: Invitation email sent to staff: {} ({}) at {}",
                     staff.getStaffNumber(), staff.getFullName(), staff.getEmail());
         } catch (Exception e) {
-            log.error("Failed to send invitation email to staff: {} - {}", staff.getEmail(), e.getMessage(), e);
-            throw new RuntimeException("Failed to send staff invitation email", e);
+            log.error("FAILED: Could not send invitation email to staff: {} - Error: {}",
+                    staff.getEmail(), e.getMessage(), e);
+            log.warn("Staff account was created but invitation email was not sent. Please send credentials manually.");
         }
     }
 

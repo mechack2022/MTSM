@@ -11,6 +11,8 @@
 
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useStaffById, useUpdateStaff } from '@/hooks/use-staff'
+import toast from 'react-hot-toast'
 
 export default function EditStaffPage() {
   const navigate = useNavigate()
@@ -18,22 +20,45 @@ export default function EditStaffPage() {
   const [staffManagementOpen, setStaffManagementOpen] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
 
-  // Sample staff data (would come from API in production)
-  const staffData = {
-    id: staffId || 'EMP-2024-089',
-    fullName: 'Engr. Yusuf Bello',
-    email: 'y.bello@school.ng',
-    phone: '+234 803 456 7891',
-    dateOfBirth: '1985-03-15',
-    gender: 'Male',
-    address: '45 Admiralty Way, Lekki Phase 1, Lagos',
-    emergencyContact: '+234 803 456 7892',
-    role: 'Senior Specialist',
-    department: 'SSS Physics & STEM',
-    trcn: 'LA/2018/8892',
-    employmentDate: '2018-09-01',
-    status: 'Active',
-    photo: 'https://ui-avatars.com/api/?name=Yusuf+Bello&background=1976d2&color=fff&size=256',
+  const { data: staffData, isLoading } = useStaffById(staffId || null)
+  const updateStaff = useUpdateStaff()
+
+  const handleUpdateEmploymentStatus = async (newStatus: string) => {
+    if (!staffData) return
+
+    try {
+      await updateStaff.mutateAsync({
+        id: staffData.id,
+        data: { employmentStatus: newStatus }
+      })
+      toast.success(`Staff status updated to ${newStatus}`)
+    } catch (error) {
+      toast.error('Failed to update staff status')
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  if (!staffData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600">Staff not found</p>
+          <button
+            onClick={() => navigate('/staff-directory')}
+            className="mt-4 text-blue-600 hover:underline"
+          >
+            Back to Directory
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -211,13 +236,23 @@ export default function EditStaffPage() {
                     <h1 className="text-2xl font-bold text-[var(--md-sys-color-on-surface,#1a1c1e)]">
                       Staff Dossier: {staffData.fullName}
                     </h1>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 text-green-700 text-xs font-semibold">
-                      <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
-                      {staffData.status}
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+                      staffData.employmentStatus === 'ACTIVE' ? 'bg-green-50 text-green-700' :
+                      staffData.employmentStatus === 'ON_LEAVE' ? 'bg-amber-50 text-amber-700' :
+                      staffData.employmentStatus === 'SUSPENDED' ? 'bg-red-50 text-red-700' :
+                      'bg-gray-50 text-gray-700'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        staffData.employmentStatus === 'ACTIVE' ? 'bg-green-600' :
+                        staffData.employmentStatus === 'ON_LEAVE' ? 'bg-amber-600' :
+                        staffData.employmentStatus === 'SUSPENDED' ? 'bg-red-600' :
+                        'bg-gray-600'
+                      }`}></span>
+                      {staffData.employmentStatus.replace('_', ' ')}
                     </span>
                   </div>
                   <p className="text-sm text-[var(--md-sys-color-on-surface-variant,#44474e)]">
-                    Employee ID: {staffData.id} · {staffData.department}
+                    Staff Number: {staffData.staffNumber} · {staffData.department ? staffData.department.replace(/_/g, ' ') : 'General'}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -245,7 +280,7 @@ export default function EditStaffPage() {
                   </h3>
                   <div className="flex flex-col items-center gap-4">
                     <img
-                      src={staffData.photo}
+                      src={`https://ui-avatars.com/api/?name=${encodeURIComponent(staffData.fullName)}&background=1976d2&color=fff&size=256`}
                       alt={staffData.fullName}
                       className="w-32 h-32 rounded-full object-cover border-4 border-blue-100"
                     />
@@ -349,16 +384,13 @@ export default function EditStaffPage() {
 
                     <div>
                       <label className="text-xs font-semibold text-gray-600 uppercase block mb-1">
-                        Home Address
+                        Next of Kin
                       </label>
-                      {isEditing ? (
-                        <textarea
-                          defaultValue={staffData.address}
-                          rows={3}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                        />
-                      ) : (
-                        <p className="text-sm font-medium text-gray-900">{staffData.address}</p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {staffData.nextOfKin?.name || 'Not provided'}
+                      </p>
+                      {staffData.nextOfKin?.relationship && (
+                        <p className="text-xs text-gray-600">{staffData.nextOfKin.relationship}</p>
                       )}
                     </div>
 
@@ -366,15 +398,9 @@ export default function EditStaffPage() {
                       <label className="text-xs font-semibold text-gray-600 uppercase block mb-1">
                         Emergency Contact
                       </label>
-                      {isEditing ? (
-                        <input
-                          type="tel"
-                          defaultValue={staffData.emergencyContact}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                        />
-                      ) : (
-                        <p className="text-sm font-medium text-gray-900">{staffData.emergencyContact}</p>
-                      )}
+                      <p className="text-sm font-medium text-gray-900">
+                        {staffData.nextOfKin?.phone || staffData.phone || 'Not provided'}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -392,31 +418,37 @@ export default function EditStaffPage() {
                       <label className="text-xs font-semibold text-gray-600 uppercase block mb-1">
                         Role / Position
                       </label>
-                      <p className="text-sm font-medium text-gray-900">{staffData.role}</p>
+                      <p className="text-sm font-medium text-gray-900">{staffData.primaryRoleDisplay}</p>
                     </div>
                     <div>
                       <label className="text-xs font-semibold text-gray-600 uppercase block mb-1">
                         Department
                       </label>
-                      <p className="text-sm font-medium text-gray-900">{staffData.department}</p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {staffData.department ? staffData.department.replace(/_/g, ' ') : 'General'}
+                      </p>
                     </div>
                     <div>
                       <label className="text-xs font-semibold text-gray-600 uppercase block mb-1">
                         Employment Date
                       </label>
                       <p className="text-sm font-medium text-gray-900">
-                        {new Date(staffData.employmentDate).toLocaleDateString('en-GB', {
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric',
-                        })}
+                        {staffData.dateOfEmployment
+                          ? new Date(staffData.dateOfEmployment).toLocaleDateString('en-GB', {
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric',
+                            })
+                          : 'Pending activation'}
                       </p>
                     </div>
                     <div>
                       <label className="text-xs font-semibold text-gray-600 uppercase block mb-1">
-                        Years of Service
+                        Employment Type
                       </label>
-                      <p className="text-sm font-medium text-gray-900">6 years</p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {staffData.employmentType ? staffData.employmentType.replace('_', ' ') : 'Full Time'}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -524,16 +556,27 @@ export default function EditStaffPage() {
                   </h3>
 
                   <div className="space-y-4">
-                    <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                    <div className={`p-3 rounded-lg border ${
+                      staffData.trcnVerified
+                        ? 'bg-green-50 border-green-200'
+                        : 'bg-amber-50 border-amber-200'
+                    }`}>
                       <div className="flex items-center gap-2 mb-1">
-                        <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className={`w-4 h-4 ${staffData.trcnVerified ? 'text-green-600' : 'text-amber-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                         </svg>
-                        <span className="text-xs font-bold text-green-700 uppercase">TRCN Verified</span>
+                        <span className={`text-xs font-bold uppercase ${
+                          staffData.trcnVerified ? 'text-green-700' : 'text-amber-700'
+                        }`}>
+                          {staffData.trcnVerified ? 'TRCN Verified' : 'TRCN Pending'}
+                        </span>
                       </div>
-                      <p className="text-sm font-semibold text-gray-900 mb-0.5">{staffData.trcn}</p>
-                      <p className="text-xs text-gray-600">Lagos State MoE Verified</p>
-                      <p className="text-xs text-green-700 font-medium mt-1">Valid until Dec 2026</p>
+                      <p className="text-sm font-semibold text-gray-900 mb-0.5">
+                        {staffData.trcnLicenseNumber || 'Not provided'}
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        {staffData.trcnVerified ? 'Lagos State MoE Verified' : 'Verification in progress'}
+                      </p>
                     </div>
 
                     <div className="space-y-2">
@@ -582,19 +625,55 @@ export default function EditStaffPage() {
                       <span className="text-sm font-medium text-gray-900">Re-issue Staff ID Badge</span>
                     </button>
 
-                    <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white hover:bg-amber-50 text-left transition-all border border-transparent hover:border-amber-200">
-                      <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      <span className="text-sm font-medium text-gray-900">Mark On Leave</span>
-                    </button>
+                    {staffData.employmentStatus !== 'ON_LEAVE' && (
+                      <button
+                        onClick={() => handleUpdateEmploymentStatus('ON_LEAVE')}
+                        disabled={updateStaff.isPending}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white hover:bg-amber-50 text-left transition-all border border-transparent hover:border-amber-200 disabled:opacity-50"
+                      >
+                        <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span className="text-sm font-medium text-gray-900">Mark On Leave</span>
+                      </button>
+                    )}
 
-                    <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white hover:bg-red-50 text-left transition-all border border-transparent hover:border-red-200">
-                      <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                      </svg>
-                      <span className="text-sm font-medium text-gray-900">Deactivate Account</span>
-                    </button>
+                    {staffData.employmentStatus !== 'SUSPENDED' && (
+                      <button
+                        onClick={() => handleUpdateEmploymentStatus('SUSPENDED')}
+                        disabled={updateStaff.isPending}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white hover:bg-orange-50 text-left transition-all border border-transparent hover:border-orange-200 disabled:opacity-50"
+                      >
+                        <svg className="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <span className="text-sm font-medium text-gray-900">Suspend Account</span>
+                      </button>
+                    )}
+
+                    {(staffData.employmentStatus === 'ACTIVE' || staffData.employmentStatus === 'ON_LEAVE') ? (
+                      <button
+                        onClick={() => handleUpdateEmploymentStatus('INACTIVE')}
+                        disabled={updateStaff.isPending}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white hover:bg-red-50 text-left transition-all border border-transparent hover:border-red-200 disabled:opacity-50"
+                      >
+                        <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                        </svg>
+                        <span className="text-sm font-medium text-gray-900">Deactivate Account</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleUpdateEmploymentStatus('ACTIVE')}
+                        disabled={updateStaff.isPending}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white hover:bg-green-50 text-left transition-all border border-transparent hover:border-green-200 disabled:opacity-50"
+                      >
+                        <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-sm font-medium text-gray-900">Activate Account</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 

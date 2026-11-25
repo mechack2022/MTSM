@@ -28,7 +28,8 @@ const getSectionFromSchoolSection = (schoolSection: string): string[] => {
 }
 
 const mapStaffToUIFormat = (staff: Staff) => ({
-  id: staff.staffNumber,
+  id: staff.id,
+  staffNumber: staff.staffNumber,
   name: staff.fullName,
   role: staff.primaryRoleDisplay,
   department: staff.department ? staff.department.replace(/_/g, ' ') : 'General',
@@ -439,7 +440,7 @@ export default function SchoolAdminStaffDirectoryPage() {
                                 />
                                 <div>
                                   <p className="font-semibold text-[var(--md-sys-color-on-surface,#1a1c1e)]">{staff.name}</p>
-                                  <p className="text-xs text-gray-500">{staff.id}</p>
+                                  <p className="text-xs text-gray-500">{staff.staffNumber || staff.id}</p>
                                 </div>
                               </div>
                             </td>

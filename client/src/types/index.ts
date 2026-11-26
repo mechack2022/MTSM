@@ -494,3 +494,4 @@ export interface AttendanceFormData {
 }
 
 export * from './staff'
+export * from './class-arm'

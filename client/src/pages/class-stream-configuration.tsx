@@ -1,8 +1,11 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useCurrentSchool } from '@/hooks/use-schools'
 import { useAuth } from '@/store'
 import { useLogout } from '@/hooks/use-auth'
+import { useAvailableArmNames, useEligibleStaffForSection, useCreateClassArm, useUpdateClassArm, useDeleteClassArm, useClassArms } from '@/hooks/use-class-arms'
+import type { SchoolSection, ArmName, ClassName, ClassArm as ClassArmType } from '@/types/class-arm'
+import toast from 'react-hot-toast'
 
 interface ClassArm {
   id: string
@@ -496,12 +499,209 @@ export default function ClassStreamConfigurationPage() {
   const [newArmName, setNewArmName] = useState('')
   const [newArmCapacity, setNewArmCapacity] = useState(30)
   const [newArmRoom, setNewArmRoom] = useState('')
+  const [selectedStaffId, setSelectedStaffId] = useState<string>('')
+  const [editingArmId, setEditingArmId] = useState<string | null>(null)
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
   const classLevel = classId ? classLevelsData[classId] : null
+
+  // Create, Update, and Delete mutations
+  const createClassArmMutation = useCreateClassArm()
+  const updateClassArmMutation = useUpdateClassArm()
+  const deleteClassArmMutation = useDeleteClassArm()
+
+  const isEditMode = !!editingArmId
 
   const isEarlyYears = classId ? ['creche', 'pre-nursery', 'nursery-1', 'nursery-2'].includes(classId) : false
   const isPrimary = classId ? ['primary-1', 'primary-2', 'primary-3', 'primary-4', 'primary-5', 'primary-6'].includes(classId) : false
   const isJSS = classId ? ['jss-1', 'jss-2', 'jss-3'].includes(classId) : false
+
+  // Determine school section based on classId
+  const schoolSection = useMemo((): SchoolSection | null => {
+    if (!classId) return null
+    if (isEarlyYears) return 'EARLY_YEARS'
+    if (isPrimary) return 'PRIMARY'
+    if (isJSS) return 'JUNIOR_SECONDARY'
+    return 'SENIOR_SECONDARY'
+  }, [classId, isEarlyYears, isPrimary, isJSS])
+
+  // Fetch available arm names from backend
+  const { data: availableArmNames, isLoading: loadingArmNames } = useAvailableArmNames(schoolSection)
+
+  // Fetch eligible staff for this section
+  const { data: eligibleStaff, isLoading: loadingStaff } = useEligibleStaffForSection(schoolSection)
+
+  // Fetch real class arms for this section
+  const { data: classArmsData, isLoading: loadingClassArms } = useClassArms({
+    section: schoolSection || undefined,
+  })
+
+  // Filter class arms for the current class and transform to UI format
+  const realClassArms = useMemo(() => {
+    if (!classArmsData || !classLevel) return []
+
+    // Filter arms that match the current class
+    return classArmsData
+      .filter((arm) => {
+        // Match by class name (e.g., "JSS 1" matches JSS_1)
+        const armClassName = arm.classNameDisplay
+        return armClassName === classLevel.name
+      })
+      .map((arm) => ({
+        id: arm.id,
+        name: arm.fullName,
+        streamType: arm.schoolSectionDisplay,
+        roomNumber: 'TBD', // Backend doesn't have room info yet
+        formTutor: arm.leadCaregiverName || 'Pending Allocation',
+        currentCapacity: arm.currentEnrollment,
+        maxCapacity: arm.capacity,
+      }))
+  }, [classArmsData, classLevel])
+
+  // Helper function to format enum values for display
+  const formatArmName = (armName: ArmName | string): string => {
+    return armName
+      .toString()
+      .replace(/_/g, ' ')
+      .split(' ')
+      .map(word => word.charAt(0) + word.slice(1).toLowerCase())
+      .join(' ')
+  }
+
+  // Helper function to convert classId to ClassName enum
+  const getClassNameEnum = (classId: string): ClassName | null => {
+    const mapping: Record<string, ClassName> = {
+      'creche': 'CRECHE',
+      'pre-nursery': 'PRE_NURSERY',
+      'nursery-1': 'NURSERY_1',
+      'nursery-2': 'NURSERY_2',
+      'primary-1': 'PRIMARY_1',
+      'primary-2': 'PRIMARY_2',
+      'primary-3': 'PRIMARY_3',
+      'primary-4': 'PRIMARY_4',
+      'primary-5': 'PRIMARY_5',
+      'primary-6': 'PRIMARY_6',
+      'jss-1': 'JSS_1',
+      'jss-2': 'JSS_2',
+      'jss-3': 'JSS_3',
+      'sss-1': 'SSS_1',
+      'sss-2': 'SSS_2',
+      'sss-3': 'SSS_3',
+    }
+    return mapping[classId] || null
+  }
+
+  // Helper function to extract arm name from full name and convert to enum
+  const extractArmNameEnum = (fullName: string, className: string): ArmName | null => {
+    // Remove the class name prefix to get just the arm name
+    const armNamePart = fullName.replace(className, '').trim()
+
+    // Convert to enum format (e.g., "Sunshine" -> "SUNSHINE", "Bece Alpha" -> "BECE_ALPHA")
+    const enumFormat = armNamePart
+      .toUpperCase()
+      .replace(/\s+/g, '_')
+      .replace(/[^A-Z_]/g, '')
+
+    return enumFormat as ArmName
+  }
+
+  // Handle edit button click
+  const handleEditArm = (arm: ClassArmType) => {
+    // Populate form with arm data
+    setNewArmName(arm.fullName)
+    setNewArmCapacity(arm.capacity)
+    setNewArmRoom('') // Backend doesn't have room info yet
+    setSelectedStaffId(arm.leadCaregiverId || '')
+    setEditingArmId(arm.id)
+
+    // Scroll to form
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // Handle cancel edit
+  const handleCancelEdit = () => {
+    setNewArmName('')
+    setNewArmCapacity(isEarlyYears ? 15 : isPrimary ? 30 : isJSS ? 35 : 30)
+    setNewArmRoom('')
+    setSelectedStaffId('')
+    setEditingArmId(null)
+  }
+
+  // Handle delete class arm
+  const handleDeleteClassArm = async (armId: string) => {
+    try {
+      await deleteClassArmMutation.mutateAsync(armId)
+      setDeleteConfirmId(null)
+      setOpenDropdownId(null)
+    } catch (error) {
+      console.error('Failed to delete class arm:', error)
+    }
+  }
+
+  // Form submit handler
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!classId || !schoolSection) {
+      toast.error('Invalid class configuration')
+      return
+    }
+
+    if (!newArmName.trim()) {
+      toast.error('Please enter an arm name')
+      return
+    }
+
+    const classNameEnum = getClassNameEnum(classId)
+    if (!classNameEnum) {
+      toast.error('Invalid class selected')
+      return
+    }
+
+    const armNameEnum = extractArmNameEnum(newArmName, classLevel?.name || '')
+    if (!armNameEnum) {
+      toast.error('Please select a valid arm name from the presets')
+      return
+    }
+
+    try {
+      if (isEditMode && editingArmId) {
+        // UPDATE existing class arm
+        await updateClassArmMutation.mutateAsync({
+          id: editingArmId,
+          data: {
+            className: classNameEnum,
+            armName: armNameEnum,
+            capacity: newArmCapacity,
+            leadCaregiverId: selectedStaffId || null,
+            isActive: true,
+          },
+        })
+      } else {
+        // CREATE new class arm
+        await createClassArmMutation.mutateAsync({
+          schoolSection: schoolSection,
+          className: classNameEnum,
+          armName: armNameEnum,
+          capacity: newArmCapacity,
+          leadCaregiverId: selectedStaffId || null,
+          academicYearId: null, // TODO: Get current academic year
+          isActive: true,
+        })
+      }
+
+      // Reset form on success
+      setNewArmName('')
+      setNewArmCapacity(isEarlyYears ? 15 : isPrimary ? 30 : isJSS ? 35 : 30)
+      setNewArmRoom('')
+      setSelectedStaffId('')
+      setEditingArmId(null)
+    } catch (error) {
+      // Error is handled by the mutation hook
+      console.error(`Failed to ${isEditMode ? 'update' : 'create'} class arm:`, error)
+    }
+  }
 
   const staffLabel = isEarlyYears ? 'Caregiver' : 'Form Tutor'
   const armLabel = isEarlyYears ? 'Pod/Arm' : 'Arm'
@@ -552,8 +752,8 @@ export default function ClassStreamConfigurationPage() {
     )
   }
 
-  const totalEnrolled = classLevel.arms.reduce((sum, arm) => sum + arm.currentCapacity, 0)
-  const totalCapacity = classLevel.arms.reduce((sum, arm) => sum + arm.maxCapacity, 0)
+  const totalEnrolled = realClassArms.reduce((sum, arm) => sum + arm.currentCapacity, 0)
+  const totalCapacity = realClassArms.reduce((sum, arm) => sum + arm.maxCapacity, 0)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -731,7 +931,7 @@ export default function ClassStreamConfigurationPage() {
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">School Topology: {school.topology}</h2>
                   <p className="text-sm text-gray-600">
-                    {classLevel.arms.length} Arm{classLevel.arms.length !== 1 ? 's' : ''} Configured • {totalEnrolled}/{totalCapacity} Students Enrolled
+                    {realClassArms.length} Arm{realClassArms.length !== 1 ? 's' : ''} Configured • {totalEnrolled}/{totalCapacity} Students Enrolled
                   </p>
                 </div>
               </div>
@@ -747,11 +947,19 @@ export default function ClassStreamConfigurationPage() {
                     </p>
                   </div>
                   <span className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-700 text-xs font-bold uppercase">
-                    Total: {classLevel.arms.length} {armLabel}s
+                    Total: {realClassArms.length} {armLabel}s
                   </span>
                 </div>
 
-                {classLevel.arms.length === 0 ? (
+                {loadingClassArms ? (
+                  <div className="p-12 rounded-xl bg-white border-2 border-gray-200 text-center">
+                    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                      <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Class Arms...</h3>
+                    <p className="text-sm text-gray-600">Fetching configured arms for {classLevel.name}</p>
+                  </div>
+                ) : realClassArms.length === 0 ? (
                   <div className="p-12 rounded-xl bg-white border-2 border-dashed border-gray-300 text-center">
                     <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
                       <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -763,7 +971,7 @@ export default function ClassStreamConfigurationPage() {
                   </div>
                 ) : (
                   <div className="flex flex-col gap-4">
-                    {classLevel.arms.map((arm, idx) => (
+                    {realClassArms.map((arm, idx) => (
                       <div
                         key={arm.id}
                         className="p-6 rounded-xl bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all"
@@ -791,17 +999,88 @@ export default function ClassStreamConfigurationPage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <button className="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 text-xs font-medium hover:bg-gray-200 transition-all">
+                            <button
+                              onClick={() => {
+                                // Find the full backend data for this arm
+                                const fullArmData = classArmsData?.find(a => a.id === arm.id)
+                                if (fullArmData) {
+                                  handleEditArm(fullArmData)
+                                }
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 text-xs font-medium hover:bg-gray-200 transition-all"
+                            >
                               Edit
                             </button>
                             <button className="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 text-xs font-medium hover:bg-gray-200 transition-all">
                               Reassign Tutor
                             </button>
-                            <button className="p-2 rounded-lg hover:bg-gray-100 transition-all">
-                              <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                              </svg>
-                            </button>
+                            <div className="relative">
+                              <button
+                                onClick={() => setOpenDropdownId(openDropdownId === arm.id ? null : arm.id)}
+                                className="p-2 rounded-lg hover:bg-gray-100 transition-all"
+                              >
+                                <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                </svg>
+                              </button>
+
+                              {/* Dropdown Menu */}
+                              {openDropdownId === arm.id && (
+                                <div className="absolute right-0 mt-2 w-56 rounded-lg bg-white shadow-lg border border-gray-200 z-10">
+                                  <div className="py-1">
+                                    <button
+                                      onClick={() => {
+                                        toast.info('View Students - Coming Soon')
+                                        setOpenDropdownId(null)
+                                      }}
+                                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3"
+                                    >
+                                      <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                      </svg>
+                                      View Students
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        toast.info('Activity Log - Coming Soon')
+                                        setOpenDropdownId(null)
+                                      }}
+                                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3"
+                                    >
+                                      <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                      </svg>
+                                      View Activity Log
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        toast.info('Activate/Deactivate - Coming Soon')
+                                        setOpenDropdownId(null)
+                                      }}
+                                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3"
+                                    >
+                                      <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                      </svg>
+                                      Deactivate
+                                    </button>
+                                    <div className="border-t border-gray-200 my-1"></div>
+                                    <button
+                                      onClick={() => {
+                                        setDeleteConfirmId(arm.id)
+                                        setOpenDropdownId(null)
+                                      }}
+                                      className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                      Delete Class Arm
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
 
@@ -854,18 +1133,18 @@ export default function ClassStreamConfigurationPage() {
                 <div className="rounded-xl bg-white border border-gray-200 shadow-sm p-6 sticky top-24">
                   <div className="flex items-start justify-between mb-4">
                     <div>
-                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-bold uppercase mb-2">
+                      <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase mb-2 ${isEditMode ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
                         </svg>
-                        <span>Add New Arm</span>
+                        <span>{isEditMode ? 'Edit Mode' : 'Add New Arm'}</span>
                       </div>
-                      <h3 className="text-xl font-semibold text-gray-900">Configure New {isEarlyYears ? 'Pod/Arm' : 'Stream'}</h3>
-                      <p className="text-sm text-gray-600 mt-1">Add a new {isEarlyYears ? 'pod/arm' : 'arm/stream'} to {classLevel.name}</p>
+                      <h3 className="text-xl font-semibold text-gray-900">{isEditMode ? 'Edit' : 'Configure New'} {isEarlyYears ? 'Pod/Arm' : 'Stream'}</h3>
+                      <p className="text-sm text-gray-600 mt-1">{isEditMode ? 'Update' : 'Add a new'} {isEarlyYears ? 'pod/arm' : 'arm/stream'} {isEditMode ? 'details' : `to ${classLevel.name}`}</p>
                     </div>
                   </div>
 
-                  <form className="flex flex-col gap-4" onSubmit={(e) => e.preventDefault()}>
+                  <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
                     <div className="flex flex-col gap-2">
                       <label className="text-sm font-semibold text-gray-900 flex items-center justify-between">
                         <span>{isEarlyYears ? 'Pod/Arm' : 'Stream / Arm'} Name</span>
@@ -888,53 +1167,25 @@ export default function ClassStreamConfigurationPage() {
                         <span className="text-xs text-gray-500 uppercase font-semibold">
                           Quick Presets{isPrimary && ' (Gemstone Schema)'}{isJSS && ' (Junior Secondary)'}:
                         </span>
-                        <div className="flex flex-wrap gap-2">
-                          {isEarlyYears
-                            ? ['Sunshine', 'Rainbow', 'Stars', 'Dolphins', 'Butterflies', 'Little Angels', 'Bluebell', 'Daisy'].map(
-                                (preset) => (
-                                  <button
-                                    key={preset}
-                                    type="button"
-                                    onClick={() => setNewArmName(`${classLevel.name} ${preset}`)}
-                                    className="px-3 py-1 rounded-full bg-gray-100 hover:bg-blue-600 hover:text-white text-xs font-medium text-gray-700 transition-colors"
-                                  >
-                                    {preset}
-                                  </button>
-                                )
-                              )
-                            : isPrimary
-                            ? ['Gold', 'Silver', 'Diamond', 'Emerald', 'Ruby', 'Sapphire', 'Pearl'].map((preset) => (
-                                <button
-                                  key={preset}
-                                  type="button"
-                                  onClick={() => setNewArmName(`${classLevel.name} ${preset}`)}
-                                  className="px-3 py-1 rounded-full bg-gray-100 hover:bg-blue-600 hover:text-white text-xs font-medium text-gray-700 transition-colors"
-                                >
-                                  {preset}
-                                </button>
-                              ))
-                            : isJSS
-                            ? ['Diamond', 'Silver', 'Pearl', 'Sapphire', 'Emerald', 'Bronze', 'Tech', 'Business', 'Agric', 'BECE Alpha', 'BECE Beta'].map((preset) => (
-                                <button
-                                  key={preset}
-                                  type="button"
-                                  onClick={() => setNewArmName(`${classLevel.name} ${preset}`)}
-                                  className="px-3 py-1 rounded-full bg-gray-100 hover:bg-blue-600 hover:text-white text-xs font-medium text-gray-700 transition-colors"
-                                >
-                                  {preset}
-                                </button>
-                              ))
-                            : ['Gold', 'Silver', 'Diamond', 'Emerald', 'Ruby', 'Science', 'Commercial', 'Arts'].map((preset) => (
-                                <button
-                                  key={preset}
-                                  type="button"
-                                  onClick={() => setNewArmName(`${classLevel.name} ${preset}`)}
-                                  className="px-3 py-1 rounded-full bg-gray-100 hover:bg-blue-600 hover:text-white text-xs font-medium text-gray-700 transition-colors"
-                                >
-                                  {preset}
-                                </button>
-                              ))}
-                        </div>
+                        {loadingArmNames ? (
+                          <div className="flex items-center gap-2 py-2">
+                            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                            <span className="text-xs text-gray-500">Loading presets...</span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            {availableArmNames?.map((armName) => (
+                              <button
+                                key={armName}
+                                type="button"
+                                onClick={() => setNewArmName(`${classLevel.name} ${formatArmName(armName)}`)}
+                                className="px-3 py-1 rounded-full bg-gray-100 hover:bg-blue-600 hover:text-white text-xs font-medium text-gray-700 transition-colors"
+                              >
+                                {formatArmName(armName)}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -987,39 +1238,23 @@ export default function ClassStreamConfigurationPage() {
                       <label className="text-sm font-semibold text-gray-900">
                         Assign Lead {isEarlyYears ? 'Caregiver / Early Years Tutor' : 'Form Teacher'}
                       </label>
-                      <select className="w-full h-11 px-4 rounded-lg bg-gray-50 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/40 transition-all border border-gray-200 cursor-pointer">
+                      <select
+                        className="w-full h-11 px-4 rounded-lg bg-gray-50 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600/40 transition-all border border-gray-200 cursor-pointer"
+                        disabled={loadingStaff}
+                        value={selectedStaffId}
+                        onChange={(e) => setSelectedStaffId(e.target.value)}
+                      >
                         <option value="">-- Assign Later (Pending Allocation) --</option>
-                        {isEarlyYears ? (
-                          <>
-                            <option value="t1">Miss Joy Bassey (TRCN Certified Montessori Lead)</option>
-                            <option value="t2">Mrs. Esther Okoro (Early Childhood Dip.)</option>
-                            <option value="t3">Miss Mercy Akpan (Pediatric Care Certified)</option>
-                          </>
-                        ) : isPrimary ? (
-                          <>
-                            <option value="t1">Mr. Kunle Adeleke (TRCN Verified Primary Educator)</option>
-                            <option value="t2">Mrs. Blessing Effiong (Primary Core Specialist)</option>
-                            <option value="t3">Miss Zainab Aliyu (Junior STEM Instructor)</option>
-                            <option value="t4">Mr. Chidi Nwosu (UBE Certified Teacher)</option>
-                          </>
-                        ) : isJSS ? (
-                          <>
-                            <option value="t1">Mrs. Aisha Ibrahim (TRCN Junior Secondary Educator)</option>
-                            <option value="t2">Mr. David Okafor (Basic Science Specialist)</option>
-                            <option value="t3">Miss Clara Adewale (Creative Arts & CCA Instructor)</option>
-                            <option value="t4">Mr. Emmanuel Bassey (Pre-Vocational Tech Lead)</option>
-                            <option value="t5">Mrs. Ngozi Obi (French & Business Studies)</option>
-                            <option value="t6">Mr. Musa Abdullahi (Agric Science Specialist)</option>
-                            <option value="t7">Dr. Amina Hassan (BECE Coordinator & Lead Tutor)</option>
-                            <option value="t8">Mr. Joseph Ekong (BECE Mathematics Lead)</option>
-                          </>
+                        {loadingStaff ? (
+                          <option value="" disabled>Loading eligible staff...</option>
+                        ) : eligibleStaff && eligibleStaff.length > 0 ? (
+                          eligibleStaff.map((staff) => (
+                            <option key={staff.id} value={staff.id}>
+                              {staff.fullName} ({staff.primaryRoleDisplay})
+                            </option>
+                          ))
                         ) : (
-                          <>
-                            <option value="t1">Mr. Anthony Akpan (Senior Physics Tutor)</option>
-                            <option value="t2">Mrs. Grace Effiong (Mathematics Lead)</option>
-                            <option value="t3">Mr. Babatunde Lawal (Economics Master)</option>
-                            <option value="t4">Dr. Halima Bello (Literature in English)</option>
-                          </>
+                          <option value="" disabled>No eligible staff found for this section</option>
                         )}
                       </select>
                       <p className="text-xs text-gray-600">
@@ -1056,15 +1291,26 @@ export default function ClassStreamConfigurationPage() {
                     <div className="pt-4 flex items-center gap-3">
                       <button
                         type="submit"
-                        className="flex-1 h-11 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all shadow-sm flex items-center justify-center gap-2"
+                        disabled={isEditMode ? updateClassArmMutation.isPending : createClassArmMutation.isPending}
+                        className="flex-1 h-11 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all shadow-sm flex items-center justify-center gap-2"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                        <span>Add {armLabel} to {classLevel.name}</span>
+                        {(isEditMode ? updateClassArmMutation.isPending : createClassArmMutation.isPending) ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <span>{isEditMode ? 'Updating...' : 'Creating...'}</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                            <span>{isEditMode ? `Update ${armLabel}` : `Add ${armLabel} to ${classLevel.name}`}</span>
+                          </>
+                        )}
                       </button>
                       <button
                         type="button"
+                        onClick={handleCancelEdit}
                         className="h-11 px-4 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold transition-all"
                       >
                         Cancel
@@ -1093,6 +1339,88 @@ export default function ClassStreamConfigurationPage() {
           </div>
         </main>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 relative animate-in fade-in zoom-in duration-200">
+            {/* Warning Icon */}
+            <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+
+            {/* Title */}
+            <h3 className="text-xl font-bold text-gray-900 text-center mb-2">Delete Class Arm?</h3>
+
+            {/* Class Arm Name */}
+            {(() => {
+              const armToDelete = classArmsData?.find(a => a.id === deleteConfirmId)
+              return armToDelete ? (
+                <div className="mb-4 p-3 rounded-lg bg-gray-50 border border-gray-200">
+                  <p className="text-sm text-gray-600 text-center">
+                    You are about to delete:
+                  </p>
+                  <p className="text-base font-semibold text-gray-900 text-center mt-1">
+                    {armToDelete.fullName}
+                  </p>
+                  {armToDelete.leadCaregiverName && (
+                    <p className="text-xs text-gray-600 text-center mt-1">
+                      Lead: {armToDelete.leadCaregiverName}
+                    </p>
+                  )}
+                </div>
+              ) : null
+            })()}
+
+            {/* Warning Message */}
+            <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200">
+              <div className="flex items-start gap-3">
+                <svg className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-red-900 mb-1">Warning: This action cannot be undone</p>
+                  <p className="text-xs text-red-700 leading-relaxed">
+                    This will permanently delete the class arm. If students are enrolled, deletion will be prevented.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                disabled={deleteClassArmMutation.isPending}
+                className="flex-1 h-11 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:cursor-not-allowed text-gray-700 text-sm font-semibold transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteClassArm(deleteConfirmId)}
+                disabled={deleteClassArmMutation.isPending}
+                className="flex-1 h-11 rounded-lg bg-red-600 hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all shadow-sm flex items-center justify-center gap-2"
+              >
+                {deleteClassArmMutation.isPending ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    <span>Confirm Delete</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
